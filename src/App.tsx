@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import {
   BrowserRouter as Router,
   Routes,
@@ -7,6 +7,7 @@ import {
   useParams,
   useNavigate,
 } from "react-router-dom";
+
 import Header from "./Header";
 import HomePage from "./HomePage";
 import LoginPage from "./LoginPage";
@@ -14,160 +15,171 @@ import RegisterPage from "./RegisterPage";
 import UserProfilePage from "./UserProfilePage";
 import MovieDetailsPage from "./MovieDetailsPage";
 import AdminDashboard from "./AdminDashboard/AdminDashboard";
+
 import { getCurrentUser, logout } from "./api/auth";
 import * as movie from "./api/movie";
 import { jwtDecode } from "jwt-decode";
+import { ROUTES, UserRole, type UserRoleType } from "./constants";
 
-type UserRole = "ADMIN" | "USER";
-
+// Типизация данных, хранящихся в JWT токене
 interface TokenPayload {
   sub: string;
-  role: UserRole;
+  role: UserRoleType;
   exp: number;
   iat: number;
 }
 
-interface AuthData {
-  accessToken: string;
-}
-
-// Главный компонент приложения
 export default function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [userInfo, setUserInfo] = useState<TokenPayload | null>(null);
+  const [userRole, setUserRole] = useState<UserRoleType | null>(null);
 
-  // При монтировании пытаемся восстановить текущего пользователя
-  useEffect(() => {
-    const currentUser = getCurrentUser();
-
-    if (currentUser?.accessToken) {
-      setAccessToken(currentUser.accessToken);
-
-      try {
-        const decoded = jwtDecode<TokenPayload>(currentUser.accessToken);
-        setUserRole(decoded.role);
-        setUserInfo(decoded);
-      } catch (error) {
-        setUserRole(null);
-        setUserInfo(null);
-        console.error("Token decoding failed:", error);
-      }
+  /**
+   * Метод для установки данных авторизации.
+   * Декодирует токен и сохраняет роль пользователя в состояние.
+   */
+  const authenticate = useCallback((token: string) => {
+    try {
+      const decoded = jwtDecode<TokenPayload>(token);
+      setAccessToken(token);
+      setUserRole(decoded.role);
+    } catch (error) {
+      console.error("Ошибка при декодировании токена:", error);
+      handleLogout();
     }
   }, []);
+
+  // Восстановление сессии пользователя при загрузке страницы
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    if (currentUser?.accessToken) {
+      authenticate(currentUser.accessToken);
+    }
+  }, [authenticate]);
 
   const handleLogout = () => {
     logout();
     setAccessToken(null);
     setUserRole(null);
-    setUserInfo(null);
-  };
-
-  const handleAuthSuccess = (authData: AuthData) => {
-    setAccessToken(authData.accessToken);
-
-    try {
-      const decoded = jwtDecode<TokenPayload>(authData.accessToken);
-      setUserRole(decoded.role);
-      setUserInfo(decoded);
-    } catch {
-      setUserRole(null);
-      setUserInfo(null);
-    }
   };
 
   return (
     <Router>
       <div className="app-container min-vh-100 d-flex flex-column bg-dark text-light">
         <Header token={accessToken} onLogout={handleLogout} />
-        <div className="flex-grow-1">
+
+        <main className="flex-grow-1">
           <Routes>
-            <Route path="/" element={<Navigate to="/home" />} />
+            <Route path={ROUTES.ROOT} element={<Navigate to={ROUTES.HOME} />} />
 
+            {/* Авторизация и Регистрация: редирект, если пользователь уже вошел */}
             <Route
-              path="/login"
+              path={ROUTES.LOGIN}
               element={
                 accessToken ? (
-                  userRole === "ADMIN" ? (
-                    <Navigate to="/admin" />
-                  ) : (
-                    <Navigate to="/profile" />
-                  )
+                  <Navigate
+                    to={
+                      userRole === UserRole.ADMIN
+                        ? ROUTES.ADMIN
+                        : ROUTES.PROFILE
+                    }
+                  />
                 ) : (
-                  <LoginPage onLogin={handleAuthSuccess} />
+                  <LoginPage
+                    onLogin={(data: { accessToken: string }) =>
+                      authenticate(data.accessToken)
+                    }
+                  />
                 )
               }
             />
 
             <Route
-              path="/register"
+              path={ROUTES.REGISTER}
               element={
                 accessToken ? (
-                  userRole === "ADMIN" ? (
-                    <Navigate to="/admin" />
-                  ) : (
-                    <Navigate to="/profile" />
-                  )
+                  <Navigate
+                    to={
+                      userRole === UserRole.ADMIN
+                        ? ROUTES.ADMIN
+                        : ROUTES.PROFILE
+                    }
+                  />
                 ) : (
-                  <RegisterPage onRegister={handleAuthSuccess} />
+                  <RegisterPage
+                    onRegister={(data: { accessToken: string }) =>
+                      authenticate(data.accessToken)
+                    }
+                  />
                 )
               }
             />
 
+            {/* Личный кабинет пользователя (доступ только для USER) */}
             <Route
-              path="/profile"
+              path={ROUTES.PROFILE}
               element={
-                accessToken && userRole === "USER" ? (
+                accessToken && userRole === UserRole.USER ? (
                   <UserProfilePage token={accessToken} />
                 ) : (
-                  <Navigate to="/login" />
+                  <Navigate to={ROUTES.LOGIN} />
                 )
               }
             />
 
+            {/* Панель администратора (доступ только для ADMIN) */}
             <Route
-              path="/admin"
+              path={ROUTES.ADMIN}
               element={
-                accessToken && userRole === "ADMIN" ? (
+                accessToken && userRole === UserRole.ADMIN ? (
                   <AdminDashboard onBack={handleLogout} />
                 ) : (
-                  <Navigate to="/login" />
+                  <Navigate to={ROUTES.LOGIN} />
                 )
               }
             />
 
-            <Route path="/home" element={<HomePage />} />
-            <Route path="/films/:id" element={<MovieDetailsWrapper />} />
-            <Route path="*" element={<Navigate to="/" />} />
+            <Route path={ROUTES.HOME} element={<HomePage />} />
+            <Route
+              path={ROUTES.FILM_DETAILS}
+              element={<MovieDetailsWrapper />}
+            />
+
+            <Route path={ROUTES.ANY} element={<Navigate to={ROUTES.ROOT} />} />
           </Routes>
-        </div>
+        </main>
       </div>
     </Router>
   );
 }
 
+/**
+ * Обертка для страницы деталей фильма.
+ * Отвечает за загрузку данных о конкретном фильме по ID из URL.
+ */
 function MovieDetailsWrapper() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [film, setFilm] = useState<movie.Film | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  // Загружаем данные о фильме при изменении id
   useEffect(() => {
     if (!id) return;
-    movie.getFilmById(id).then(setFilm);
+
+    movie
+      .getFilmById(id)
+      .then(setFilm)
+      .catch((err) => {
+        console.error(err);
+        setError("Не удалось загрузить данные фильма");
+      });
   }, [id]);
 
-  if (!film) {
-    return <div className="text-center mt-5">Загрузка фильма...</div>;
-  }
+  if (error) return <div className="text-center mt-5 text-danger">{error}</div>;
+  if (!film) return <div className="text-center mt-5">Загрузка...</div>;
 
   const handleSelectSession = (sessionId: number) => {
     navigate(`/sessions/${sessionId}`, {
-      state: {
-        from: "movie-details",
-        timestamp: new Date().toISOString(),
-        futureFeature: "reserved_for_future_use",
-      },
+      state: { from: "movie_details", timestamp: new Date().toISOString() },
     });
   };
 
