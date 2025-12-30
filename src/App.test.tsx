@@ -84,8 +84,7 @@ describe("App Unit Tests (Routing & Auth)", () => {
   });
 
   // 6. Состояние: Защита админки от обычного юзера
-  it("юзер не должен попасть в админку (должен быть переброшен в профиль)", () => {
-    // Имитируем переход на /admin
+  it("юзер не должен попасть в админку (должен быть переброшен на главную)", () => {
     window.history.pushState({}, "", ROUTES.ADMIN);
 
     vi.mocked(authApi.getCurrentUser).mockReturnValue({
@@ -98,9 +97,8 @@ describe("App Unit Tests (Routing & Auth)", () => {
     // Проверяем, что админка НЕ отображается
     expect(screen.queryByText(/Admin Dashboard/i)).not.toBeInTheDocument();
 
-    // Проверяем, что из-за двойного редиректа (/admin -> /login -> /profile)
-    // мы оказались на странице профиля
-    expect(screen.getByText(/User Profile Page/i)).toBeInTheDocument();
+    // Теперь мы ожидаем переход на главную страницу, а не в профиль
+    expect(screen.getByText(/Home Page/i)).toBeInTheDocument();
   });
 
   // 7. Поведение: Редирект с корня
