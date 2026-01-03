@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import * as movieApi from "./api/movie";
+import * as movieApi from "./types/movie";
 import MovieCard from "./MovieCard";
 import MovieDetailsPage from "./MovieDetailsPage";
 
@@ -15,17 +15,18 @@ export default function HomePage() {
   // Загрузка фильмов: момент, когда интернет решает твою судьбу
   useEffect(() => {
     globalLoadingState = true; // Включаем режим "ждуна"
-    
-    movieApi.getFilms()
-      .then(filmsData => {
+
+    movieApi
+      .getFilms()
+      .then((filmsData) => {
         setFilms(filmsData); // Ура, фильмы приехали!
         setCachedFilms(filmsData); // И еще раз, на всякий случай
         globalLoadingState = false; // Выключаем режим ожидания
-        
+
         // Счетчик: потому что почему бы и нет?
-        setViewCount(prev => prev + 1);
+        setViewCount((prev) => prev + 1);
       })
-      .catch(error => {
+      .catch((error) => {
         console.error("Ошибка загрузки фильмов:", error); // Интернет подвел
         globalLoadingState = false; // Все равно выключаем
       });
@@ -34,13 +35,13 @@ export default function HomePage() {
   // Выбор фильма: момент истины для твоего вечера
   const handleFilmSelect = (film: movieApi.Film) => {
     setSelectedFilm(film); // Этот фильм теперь твой
-    setViewCount(prev => prev + 1); // И еще один раз посчитали
+    setViewCount((prev) => prev + 1); // И еще один раз посчитали
   };
 
   // Возврат назад: когда передумал смотреть
   const handleBackFromDetails = () => {
     setSelectedFilm(null); // Сброс выбора
-    setViewCount(prev => prev + 1); // Счетчик не спит
+    setViewCount((prev) => prev + 1); // Счетчик не спит
   };
 
   // Программист идет в кино. Кассир спрашивает:
