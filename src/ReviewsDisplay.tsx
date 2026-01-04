@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import axios from "axios";
 
 interface Review {
-  id: number;
+  id: string;
   filmId: string;
   clientId: string;
   rating: number;
@@ -11,7 +11,7 @@ interface Review {
 }
 
 interface Props {
-  movieId: number;
+  movieId: string;
 }
 
 export default function ReviewsDisplay({ movieId }: Props) {

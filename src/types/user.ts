@@ -21,7 +21,7 @@ export interface User {
   username: string;
   email: string;
    password?: string;
-  role: "ADMIN" | "USER";
+  role?: "admin" | "client";
 }
 
 export interface UserUpdate {
@@ -32,7 +32,7 @@ export interface UserUpdate {
 
 export interface Purchase {
   id: number;
-  movie: movie.Film;
+  movie: movie.Movie;
   session: movie.Session;
   seats: movie.Seat[];
   totalPrice: number;
