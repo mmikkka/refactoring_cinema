@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import MovieDetailsPage from "../MovieDetailsPage";
 import { useNavigate, useParams } from "react-router-dom";
-import * as movie from "../api/movie";
+import * as movie from "../types/movie";
 
 /**
  * Обертка для страницы деталей фильма.
