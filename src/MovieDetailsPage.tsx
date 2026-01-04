@@ -10,9 +10,12 @@ import HallPlanView from "./components/HallPlanView";
 import PaymentForm from "./components/PaymentForm";
 import ReviewsDisplay from "./ReviewsDisplay";
 
-// Импорт типов (строго по твоей просьбе)
+// Импорт типов
 import type { Film, Session } from "./types/movie";
 import type { Purchase } from "./types/user";
+
+// Импорт конфигурации
+import { API_BASE_URL, MESSAGES, PLACEHOLDER_POSTER } from "./config";
 
 interface MovieDetailsPageProps {
   movie: Film;
@@ -28,7 +31,7 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
     new Date().toISOString().split("T")[0]
   );
   const [selectedSession, setSelectedSession] = useState<Session | null>(null);
-  const [selectedSeats, setSelectedSeats] = useState<number[]>([]); // number[], т.к. в Seat id: number
+  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
 
   // Хуки данных
@@ -42,20 +45,20 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
     refreshTickets,
   } = useHallData(selectedSession?.id);
 
-  // Логика бронирования (остается здесь, как бизнес-логика оркестратора)
+  // Логика бронирования
   const handleReserve = async () => {
     const token = localStorage.getItem("token");
-    if (!token) return alert("Сначала авторизуйтесь");
+    if (!token) return alert(MESSAGES.authRequired);
 
     try {
-      // 1. Бронируем места по одному (согласно старой логике)
+      // 1. Бронируем места по одному
       // Ищем тикеты, соответствующие выбранным местам
       for (const seatId of selectedSeats) {
         // Приведение типов: seatId (number) -> ticket.seatId (string)
         const ticket = tickets.find((t) => t.seatId === String(seatId));
         if (ticket) {
           await axios.post(
-            `http://91.142.94.183:8080/tickets/${ticket.id}/reserve`,
+            `${API_BASE_URL}/tickets/${ticket.id}/reserve`,
             {},
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -69,7 +72,7 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
         .filter((id): id is string => id !== undefined);
 
       const res = await axios.post(
-        "http://91.142.94.183:8080/purchases",
+        `${API_BASE_URL}/purchases`,
         { ticketIds: ticketIdsForPurchase },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -77,7 +80,7 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
       setPurchase(res.data);
     } catch (err) {
       console.error(err);
-      alert("Ошибка при бронировании");
+      alert(MESSAGES.reserveError);
     }
   };
 
@@ -97,7 +100,7 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
         {/* Постер */}
         <div className="col-md-4">
           <img
-            src={movie.imageUrl || "https://placehold.co/300x450"}
+            src={movie.imageUrl || `${PLACEHOLDER_POSTER}`}
             alt={movie.title}
             className="img-fluid rounded shadow"
           />
