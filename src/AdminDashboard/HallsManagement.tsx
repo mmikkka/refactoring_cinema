@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { httpClient } from "../api/http";
 
 interface Seat {
   row: number;
@@ -38,7 +39,7 @@ export default function HallsManagement({ token }: HallsManagementProps) {
   const fetchHalls = async () => {
     if (!token) return;
     try {
-      const res = await fetch("http://91.142.94.183:8080/halls", {
+      const res = await fetch(`${httpClient}/halls`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -56,10 +57,9 @@ export default function HallsManagement({ token }: HallsManagementProps) {
   const fetchCategories = async () => {
     if (!token) return;
     try {
-      const res = await fetch(
-        "http://91.142.94.183:8080/seat-categories?page=0&size=50",
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      const res = await fetch(`${httpClient}/seat-categories?page=0&size=50`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       setCategories(data.data || []);
     } catch (err) {
@@ -78,8 +78,8 @@ export default function HallsManagement({ token }: HallsManagementProps) {
     try {
       const method = hall.id ? "PUT" : "POST";
       const url = hall.id
-        ? `http://91.142.94.183:8080/halls/${hall.id}`
-        : "http://91.142.94.183:8080/halls";
+        ? `${httpClient}/halls/${hall.id}`
+        : `${httpClient}/halls`;
 
       // 🔹 Генерируем плоский массив мест
       const seats: Seat[] = [];
@@ -122,7 +122,7 @@ export default function HallsManagement({ token }: HallsManagementProps) {
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить этот зал?")) return;
     try {
-      const res = await fetch(`http://91.142.94.183:8080/halls/${id}`, {
+      const res = await fetch(`${httpClient}/halls/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -140,9 +140,7 @@ export default function HallsManagement({ token }: HallsManagementProps) {
 
       <button
         className="btn btn-success mb-3"
-        onClick={() =>
-          setEditing({ name: "", number: 1, rows: [] })
-        }
+        onClick={() => setEditing({ name: "", number: 1, rows: [] })}
       >
         ➕ Добавить зал
       </button>
@@ -165,10 +163,16 @@ export default function HallsManagement({ token }: HallsManagementProps) {
               <div className="card shadow-sm p-3 text-light">
                 <strong>{h.name}</strong> — №{h.number} | {h.rows.length} рядов
                 <div className="mt-2 d-flex justify-content-between">
-                  <button className="btn btn-warning btn-sm" onClick={() => setEditing(h)}>
+                  <button
+                    className="btn btn-warning btn-sm"
+                    onClick={() => setEditing(h)}
+                  >
                     Редактировать
                   </button>
-                  <button className="btn btn-danger btn-sm" onClick={() => handleDelete(h.id!)}>
+                  <button
+                    className="btn btn-danger btn-sm"
+                    onClick={() => handleDelete(h.id!)}
+                  >
                     Удалить
                   </button>
                 </div>
@@ -180,7 +184,6 @@ export default function HallsManagement({ token }: HallsManagementProps) {
     </div>
   );
 }
-
 
 interface HallFormProps {
   hall: Hall;
@@ -202,7 +205,12 @@ function HallForm({ hall, categories, onSave, onCancel }: HallFormProps) {
       ...form,
       rows: [
         ...form.rows,
-        { id: Date.now(), rowNumber: form.rows.length + 1, seatsCount: 1, categoryId: categories[0]?.id || "" },
+        {
+          id: Date.now(),
+          rowNumber: form.rows.length + 1,
+          seatsCount: 1,
+          categoryId: categories[0]?.id || "",
+        },
       ],
     });
   };
@@ -211,7 +219,11 @@ function HallForm({ hall, categories, onSave, onCancel }: HallFormProps) {
     setForm({ ...form, rows: form.rows.filter((r) => r.id !== id) });
   };
 
-  const handleRowChange = (id: number, seatsCount: number, categoryId: string) => {
+  const handleRowChange = (
+    id: number,
+    seatsCount: number,
+    categoryId: string
+  ) => {
     setForm({
       ...form,
       rows: form.rows.map((r) =>
@@ -222,10 +234,25 @@ function HallForm({ hall, categories, onSave, onCancel }: HallFormProps) {
 
   return (
     <div className="card p-3 mb-4 shadow-sm">
-      <h5 className="mb-3 text-primary">{hall.id ? "Редактирование зала" : "Новый зал"}</h5>
+      <h5 className="mb-3 text-primary">
+        {hall.id ? "Редактирование зала" : "Новый зал"}
+      </h5>
 
-      <input className="form-control mb-2 " name="name" value={form.name} onChange={handleChange} placeholder="Название зала" />
-      <input className="form-control mb-2" name="number" type="number" value={form.number} onChange={handleChange} placeholder="Номер зала" />
+      <input
+        className="form-control mb-2 "
+        name="name"
+        value={form.name}
+        onChange={handleChange}
+        placeholder="Название зала"
+      />
+      <input
+        className="form-control mb-2"
+        name="number"
+        type="number"
+        value={form.number}
+        onChange={handleChange}
+        placeholder="Номер зала"
+      />
 
       <h6 className="text-light">Ряды и количество мест:</h6>
       {form.rows.map((row) => (
@@ -254,15 +281,26 @@ function HallForm({ hall, categories, onSave, onCancel }: HallFormProps) {
               </option>
             ))}
           </select>
-          <button className="btn btn-sm btn-danger" onClick={() => removeRow(row.id)}>✖</button>
+          <button
+            className="btn btn-sm btn-danger"
+            onClick={() => removeRow(row.id)}
+          >
+            ✖
+          </button>
         </div>
       ))}
 
-      <button className="btn btn-outline-primary mb-3" onClick={addRow}>➕ Добавить ряд</button>
+      <button className="btn btn-outline-primary mb-3" onClick={addRow}>
+        ➕ Добавить ряд
+      </button>
 
       <div className="d-flex justify-content-end">
-        <button className="btn btn-success me-2" onClick={() => onSave(form)}>💾 Сохранить</button>
-        <button className="btn btn-secondary" onClick={onCancel}>✖ Отмена</button>
+        <button className="btn btn-success me-2" onClick={() => onSave(form)}>
+          💾 Сохранить
+        </button>
+        <button className="btn btn-secondary" onClick={onCancel}>
+          ✖ Отмена
+        </button>
       </div>
     </div>
   );

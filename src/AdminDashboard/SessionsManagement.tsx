@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { usePeriodicSessions, type Period } from "../hooks/usePeriodicSessions";
 import { PeriodicSessionSettings } from "./PeriodicSessionSettings";
-import { API_BASE_URL } from "../config";
+import { httpClient } from "../api/http";
 
 interface Movie {
   id: string;
@@ -37,14 +37,14 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
   useEffect(() => {
     if (!token) return;
 
-    fetch(`${API_BASE_URL}/films?page=0&size=50`, {
+    fetch(`${httpClient}/films?page=0&size=50`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => setMovies(data.data || []))
       .catch(console.error);
 
-    fetch(`${API_BASE_URL}/halls`, {
+    fetch(`${httpClient}/halls`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -54,7 +54,7 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
 
   const fetchSessions = () => {
     if (!token) return;
-    fetch(`${API_BASE_URL}/sessions?page=0&size=50`, {
+    fetch(`${httpClient}/sessions?page=0&size=50`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -72,8 +72,8 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
     try {
       const method = session.id ? "PUT" : "POST";
       const url = session.id
-        ? `${API_BASE_URL}/sessions/${session.id}`
-        : `${API_BASE_URL}/sessions`;
+        ? `${httpClient}/sessions/${session.id}`
+        : `${httpClient}/sessions`;
 
       const res = await fetch(url, {
         method,
@@ -102,7 +102,7 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить этот сеанс?")) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/sessions/${id}`, {
+      const res = await fetch(`${httpClient}/sessions/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

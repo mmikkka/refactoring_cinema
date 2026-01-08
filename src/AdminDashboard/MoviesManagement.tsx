@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { API_BASE_URL } from "../config";
+import { httpClient } from "../api/http";
 import { type Film, createFilm, updateFilm } from "../types/movie";
 
 interface Movie {
@@ -35,7 +35,7 @@ export default function MoviesManagement({ token }: MoviesManagementProps) {
   const fetchMovies = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${API_BASE_URL}/films?page=0&size=20`, {
+      const res = await fetch(`${httpClient}/films?page=0&size=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -80,7 +80,7 @@ export default function MoviesManagement({ token }: MoviesManagementProps) {
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить этот фильм?")) return;
     try {
-      await fetch(`${API_BASE_URL}/films/${id}`, {
+      await fetch(`${httpClient}/films/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });

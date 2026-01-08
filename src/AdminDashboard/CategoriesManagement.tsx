@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { httpClient } from "../api/http";
 
 interface Category {
   id?: string;
@@ -10,7 +11,9 @@ interface CategoriesManagementProps {
   token: string;
 }
 
-export default function CategoriesManagement({ token }: CategoriesManagementProps) {
+export default function CategoriesManagement({
+  token,
+}: CategoriesManagementProps) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [editing, setEditing] = useState<Category | null>(null);
 
@@ -18,7 +21,7 @@ export default function CategoriesManagement({ token }: CategoriesManagementProp
   const fetchCategories = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`http://91.142.94.183:8080/seat-categories?page=0&size=20`, {
+      const res = await fetch(`${httpClient}/seat-categories?page=0&size=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -41,8 +44,8 @@ export default function CategoriesManagement({ token }: CategoriesManagementProp
     try {
       const method = cat.id ? "PUT" : "POST";
       const url = cat.id
-        ? `http://91.142.94.183:8080/seat-categories/${cat.id}`
-        : `http://91.142.94.183:8080/seat-categories`;
+        ? `${httpClient}/seat-categories/${cat.id}`
+        : `${httpClient}/seat-categories`;
 
       await fetch(url, {
         method,
@@ -61,12 +64,11 @@ export default function CategoriesManagement({ token }: CategoriesManagementProp
     }
   };
 
-
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить эту категорию?")) return;
 
     try {
-      await fetch(`http://91.142.94.183:8080/seat-categories/${id}`, {
+      await fetch(`${httpClient}/seat-categories/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -141,7 +143,10 @@ function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: name === "priceCents" ? Number(value) * 100 : value });
+    setForm({
+      ...form,
+      [name]: name === "priceCents" ? Number(value) * 100 : value,
+    });
   };
 
   return (
@@ -161,7 +166,7 @@ function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) {
         name="priceCents"
         type="number"
         placeholder="Цена (₽)"
-        value={form.priceCents }
+        value={form.priceCents}
         onChange={handleChange}
       />
 

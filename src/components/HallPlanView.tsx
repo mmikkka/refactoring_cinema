@@ -4,7 +4,7 @@ import type { HallPlan, Ticket } from "../types/movie";
 interface HallPlanViewProps {
   hallPlan: HallPlan;
   tickets: Ticket[];
-  selectedSeats: number[]; // В твоем типе Seat id: number, поэтому массив чисел
+  selectedSeats: number[];
   onSeatClick: (seatId: number) => void;
   loading: boolean;
 }
@@ -16,8 +16,6 @@ const HallPlanView: React.FC<HallPlanViewProps> = ({
   onSeatClick,
   loading,
 }) => {
-  // В твоем типе Ticket seatId - это string, а в Seat id - number.
-  // Нам нужно приведение типов для сравнения.
   const getTicketStatus = (seatId: number) => {
     const ticket = tickets.find((t) => t.seatId === String(seatId));
     return ticket ? ticket.status : "SOLD"; // Если билета нет, считаем что продано или недоступно
@@ -60,7 +58,6 @@ const HallPlanView: React.FC<HallPlanViewProps> = ({
                       style={{ width: "40px", height: "40px", padding: "0" }}
                       disabled={status !== "AVAILABLE"}
                       onClick={() => onSeatClick(seat.id)}
-                      // В твоем типе Seat цена и категория лежат прямо внутри
                       title={`Место ${seat.number} (${seat.category}) — ${seat.price} ₽`}
                     >
                       {seat.number}

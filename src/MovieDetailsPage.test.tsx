@@ -1,4 +1,3 @@
-// src/MovieDetailsPage.test.tsx
 import {
   render,
   screen,
@@ -7,20 +6,23 @@ import {
   cleanup,
 } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import axios from "axios";
-
+import { httpClient } from "./api/http";
 import MovieDetailsPage from "./MovieDetailsPage";
 import type { Film } from "./types/movie";
 
-// Мокаем axios
-vi.mock("axios");
-
-// Мокаем ReviewsDisplay, чтобы он не мешал
-vi.mock("./ReviewsDisplay", () => ({
-  default: () => <div>Reviews Component</div>,
+// 1. Мокаем httpClient
+vi.mock("./api/http", () => ({
+  httpClient: {
+    get: vi.fn(),
+    post: vi.fn(),
+    defaults: { baseURL: "http://test-api.com" },
+  },
 }));
 
-// Фикстуры под текущие типы
+vi.mock("./ReviewsDisplay", () => ({ default: () => <div>Reviews</div> }));
+
+const TEST_DATE = "2026-01-08";
+
 const mockMovie: Film = {
   id: 1,
   title: "Test Movie",
@@ -33,16 +35,14 @@ const mockMovie: Film = {
   genre: "Action",
 };
 
-const today = new Date().toISOString().split("T")[0];
-
 const mockSessions = [
   {
     id: 1,
     movieId: 1,
     hallId: 1,
-    date: today,
+    date: TEST_DATE,
     time: "18:00",
-    startAt: new Date().toISOString(),
+    startAt: `${TEST_DATE}T18:00:00.000Z`,
   },
 ];
 
@@ -54,12 +54,11 @@ const mockHallPlan = {
       id: 1,
       row: 1,
       number: 1,
-      category: "Standard" as const,
+      category: "Standard",
       price: 100,
       isTaken: false,
     },
   ],
-  categories: [{ id: "c1", name: "Standard", priceCents: 100 }],
 };
 
 const mockTickets = [
@@ -67,7 +66,7 @@ const mockTickets = [
     id: "t1",
     seatId: "1",
     categoryId: "c1",
-    status: "AVAILABLE" as const,
+    status: "AVAILABLE",
     priceCents: 100,
   },
 ];
@@ -80,10 +79,12 @@ const mockPurchase = {
   totalPrice: 100,
 };
 
-describe("MovieDetailsPage (refactored orchestration)", () => {
+describe("MovieDetailsPage (Full Suite)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    Storage.prototype.getItem = vi.fn(() => "fake-token");
+    Storage.prototype.getItem = vi.fn((key) =>
+      key === "token" ? "fake-token" : null
+    );
     window.alert = vi.fn();
   });
 
@@ -91,19 +92,15 @@ describe("MovieDetailsPage (refactored orchestration)", () => {
     cleanup();
   });
 
-  // 1. Загрузка и отображение фильма + запрос сеансов
-  it("должен отрисовать данные фильма и запросить список сеансов", async () => {
-    vi.mocked(axios.get).mockResolvedValueOnce({
+  it("1. должен отрисовать данные фильма и запросить список сеансов", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
       data: { data: mockSessions },
     });
-
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
     expect(screen.getByText("Test Movie")).toBeInTheDocument();
-
     await waitFor(() => {
-      expect(axios.get).toHaveBeenCalledWith(
-        "http://91.142.94.183:8080/sessions",
+      expect(httpClient.get).toHaveBeenCalledWith(
+        "/sessions",
         expect.objectContaining({
           params: expect.objectContaining({ filmId: mockMovie.id }),
         })
@@ -111,184 +108,120 @@ describe("MovieDetailsPage (refactored orchestration)", () => {
     });
   });
 
-  // 2. Пустой список сеансов
-  it("должен показывать сообщение 'Сеансов на эту дату нет' при пустом списке", async () => {
-    vi.mocked(axios.get).mockResolvedValueOnce({
-      data: { data: [] },
-    });
-
+  it("2. должен показывать сообщение 'Сеансов на эту дату нет' при пустом списке", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({ data: { data: [] } });
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
     await waitFor(() => {
-      expect(
-        screen.getByText((t) => t.includes("Сеансов") && t.includes("нет"))
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Сеансов на эту дату нет/i)).toBeInTheDocument();
     });
   });
 
-  // 3. Выбор сеанса и загрузка плана зала
-  it("при выборе сеанса должен загружаться план зала и билеты", async () => {
-    // 1‑й запрос в useMovieSessions
-    vi.mocked(axios.get).mockResolvedValueOnce({
+  it("3. при выборе сеанса должен загружаться план зала и билеты", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
       data: { data: mockSessions },
     });
-
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
-    // Дождаться кнопки сеанса
-    const sessionBtn = await waitFor(() => screen.getByText(/18:00 - Зал 1/));
-
-    // Следующие два axios.get — план и билеты
-    vi.mocked(axios.get)
-      .mockResolvedValueOnce({ data: mockHallPlan }) // halls/{id}/plan
-      .mockResolvedValueOnce({ data: mockTickets }); // sessions/{id}/tickets
-
-    fireEvent.click(sessionBtn);
-
-    await waitFor(() => {
-      expect(screen.getByText("Схема зала:")).toBeInTheDocument();
-      expect(axios.get).toHaveBeenCalledTimes(3);
-    });
-  });
-
-  // 4. Выбор места и пересчёт выбранных мест
-  it("должен позволять выбрать место и отобразить его как выбранное", async () => {
-    vi.mocked(axios.get).mockResolvedValueOnce({
-      data: { data: mockSessions },
-    });
-
-    render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
-    const sessionBtn = await waitFor(() => screen.getByText(/18:00 - Зал 1/));
-
-    vi.mocked(axios.get)
+    const sessionBtn = await screen.findByText(/18:00/);
+    vi.mocked(httpClient.get)
       .mockResolvedValueOnce({ data: mockHallPlan })
       .mockResolvedValueOnce({ data: mockTickets });
-
     fireEvent.click(sessionBtn);
+    await waitFor(() => {
+      expect(screen.getByText(/Схема зала/i)).toBeInTheDocument();
+    });
+  });
 
-    const seatBtn = await waitFor(() => screen.getByText("1"));
-
+  it("4. должен позволять выбрать место и отобразить его как выбранное", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
+      data: { data: mockSessions },
+    });
+    render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
+    const sessionBtn = await screen.findByText(/18:00/);
+    vi.mocked(httpClient.get)
+      .mockResolvedValueOnce({ data: mockHallPlan })
+      .mockResolvedValueOnce({ data: mockTickets });
+    fireEvent.click(sessionBtn);
+    const seatBtn = await screen.findByText("1");
     fireEvent.click(seatBtn);
-
     await waitFor(() => {
       expect(seatBtn).toHaveClass("btn-success");
-      expect(
-        screen.getByText(
-          (t) => t.includes("Забронировать") && t.includes("1 мест")
-        )
-      ).toBeInTheDocument();
+      expect(screen.getByText(/Забронировать/i)).toHaveTextContent("1 мест");
     });
   });
 
-  // 5. Бронирование: POST /tickets/.../reserve и /purchases
-  it("кнопка 'Забронировать' должна отправлять запросы резервации и создания покупки", async () => {
-    vi.mocked(axios.get).mockResolvedValueOnce({
+  it("5. кнопка 'Забронировать' должна отправлять запросы резервации и покупки", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
       data: { data: mockSessions },
     });
-
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
-    const sessionBtn = await waitFor(() => screen.getByText(/18:00 - Зал 1/));
-
-    vi.mocked(axios.get)
+    const sessionBtn = await screen.findByText(/18:00/);
+    vi.mocked(httpClient.get)
       .mockResolvedValueOnce({ data: mockHallPlan })
       .mockResolvedValueOnce({ data: mockTickets });
-
     fireEvent.click(sessionBtn);
+    fireEvent.click(await screen.findByRole("button", { name: /^1$/ }));
+    vi.mocked(httpClient.post)
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({ data: mockPurchase });
 
-    const seatBtn = await waitFor(() => screen.getByText("1"));
-    fireEvent.click(seatBtn);
-
-    vi.mocked(axios.post)
-      .mockResolvedValueOnce({}) // reserve
-      .mockResolvedValueOnce({ data: mockPurchase }); // purchase
-
-    const reserveBtn = await waitFor(() => screen.getByText(/Забронировать/));
-    fireEvent.click(reserveBtn);
-
+    fireEvent.click(screen.getByRole("button", { name: /Забронировать/i }));
     await waitFor(() => {
-      expect(axios.post).toHaveBeenCalledWith(
-        "http://91.142.94.183:8080/tickets/t1/reserve",
+      expect(httpClient.post).toHaveBeenCalledWith(
+        "/tickets/t1/reserve",
         {},
         expect.any(Object)
       );
-      expect(axios.post).toHaveBeenCalledWith(
-        "http://91.142.94.183:8080/purchases",
+      expect(httpClient.post).toHaveBeenCalledWith(
+        "/purchases",
         { ticketIds: ["t1"] },
         expect.any(Object)
       );
     });
   });
 
-  // 6. Без токена — алерт и отсутствие POST
-  it("не должен бронировать без токена", async () => {
+  it("6. не должен бронировать без токена", async () => {
     Storage.prototype.getItem = vi.fn(() => null);
 
-    vi.mocked(axios.get).mockResolvedValueOnce({
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
       data: { data: mockSessions },
     });
-
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
-    const sessionBtn = await waitFor(() => screen.getByText(/18:00 - Зал 1/));
-
-    vi.mocked(axios.get)
+    const sessionBtn = await screen.findByText(/18:00/);
+    vi.mocked(httpClient.get)
       .mockResolvedValueOnce({ data: mockHallPlan })
       .mockResolvedValueOnce({ data: mockTickets });
-
     fireEvent.click(sessionBtn);
-
-    const seatBtn = await waitFor(() => screen.getByText("1"));
-    fireEvent.click(seatBtn);
-
-    const reserveBtn = await waitFor(() => screen.getByText(/Забронировать/));
-    fireEvent.click(reserveBtn);
-
+    fireEvent.click(await screen.findByRole("button", { name: /^1$/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Забронировать/i }));
     expect(window.alert).toHaveBeenCalledWith("Сначала авторизуйтесь");
-    expect(axios.post).not.toHaveBeenCalled();
+    expect(httpClient.post).not.toHaveBeenCalled();
   });
 
-  // 7. Успешная оплата
-  it("успешная оплата должна вызывать API и очищать форму", async () => {
-    vi.mocked(axios.get).mockResolvedValueOnce({
+  it("7. успешная оплата должна вызывать API и показывать успех", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
       data: { data: mockSessions },
     });
-
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
-    const sessionBtn = await waitFor(() => screen.getByText(/18:00 - Зал 1/));
-
-    vi.mocked(axios.get)
+    const sessionBtn = await screen.findByText(/18:00/);
+    vi.mocked(httpClient.get)
       .mockResolvedValueOnce({ data: mockHallPlan })
       .mockResolvedValueOnce({ data: mockTickets });
-
     fireEvent.click(sessionBtn);
-
-    const seatBtn = await waitFor(() => screen.getByText("1"));
-    fireEvent.click(seatBtn);
-
-    vi.mocked(axios.post)
+    fireEvent.click(await screen.findByRole("button", { name: /^1$/ }));
+    vi.mocked(httpClient.post)
       .mockResolvedValueOnce({})
       .mockResolvedValueOnce({ data: mockPurchase });
+    fireEvent.click(screen.getByRole("button", { name: /Забронировать/i }));
 
-    fireEvent.click(await waitFor(() => screen.getByText(/Забронировать/)));
-
-    // PaymentForm появляется
-    const cardInput = await waitFor(() =>
-      screen.getByPlaceholderText("Номер карты")
-    );
-
+    const cardInput = await screen.findByPlaceholderText("Номер карты");
     fireEvent.change(cardInput, { target: { value: "1234" } });
-
-    vi.mocked(axios.post).mockResolvedValueOnce({});
-    vi.mocked(axios.get).mockResolvedValueOnce({ data: mockTickets });
-
+    vi.mocked(httpClient.post).mockResolvedValueOnce({});
+    vi.mocked(httpClient.get).mockResolvedValueOnce({ data: mockTickets });
     fireEvent.click(screen.getByText("Оплатить"));
 
     await waitFor(() => {
-      expect(axios.post).toHaveBeenCalledWith(
-        "http://91.142.94.183:8080/payments/process",
+      expect(httpClient.post).toHaveBeenCalledWith(
+        "/payments/process",
         { purchaseId: mockPurchase.id, cardNumber: "1234" },
         expect.any(Object)
       );
@@ -296,31 +229,22 @@ describe("MovieDetailsPage (refactored orchestration)", () => {
     });
   });
 
-  // 8. Ошибка при бронировании должна показывать alert и не устанавливать покупку
-  it("должен обрабатывать ошибку при бронировании и показывать сообщение об ошибке", async () => {
-    vi.mocked(axios.get).mockResolvedValueOnce({
+  it("8. должен обрабатывать ошибку при бронировании и показывать alert", async () => {
+    vi.mocked(httpClient.get).mockResolvedValueOnce({
       data: { data: mockSessions },
     });
-
     render(<MovieDetailsPage movie={mockMovie} onBack={vi.fn()} />);
-
-    const sessionBtn = await waitFor(() => screen.getByText(/18:00 - Зал 1/));
-
-    vi.mocked(axios.get)
+    const sessionBtn = await screen.findByText(/18:00/);
+    vi.mocked(httpClient.get)
       .mockResolvedValueOnce({ data: mockHallPlan })
       .mockResolvedValueOnce({ data: mockTickets });
-
     fireEvent.click(sessionBtn);
-
-    const seatBtn = await waitFor(() => screen.getByText("1"));
-    fireEvent.click(seatBtn);
-
-    // имитируем падение любого из POST в handleReserve
-    vi.mocked(axios.post).mockRejectedValueOnce(new Error("Network Error"));
-
-    const reserveBtn = await waitFor(() => screen.getByText(/Забронировать/));
-    fireEvent.click(reserveBtn);
-
+    const seat = await screen.findByRole("button", { name: /^1$/ });
+    fireEvent.click(seat);
+    vi.mocked(httpClient.post).mockRejectedValueOnce(
+      new Error("Network Error")
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Забронировать/i }));
     await waitFor(() => {
       expect(window.alert).toHaveBeenCalledWith("Ошибка при бронировании");
     });

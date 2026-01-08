@@ -1,5 +1,4 @@
 import React, { useState } from "react";
-import axios from "axios";
 
 // Импорт хуков
 import { useMovieSessions, useHallData } from "./hooks/useMovieDetails";
@@ -15,7 +14,8 @@ import type { Film, Session } from "./types/movie";
 import type { Purchase } from "./types/user";
 
 // Импорт конфигурации
-import { API_BASE_URL, MESSAGES, PLACEHOLDER_POSTER } from "./config";
+import { MESSAGES, PLACEHOLDER_POSTER } from "./config";
+import { httpClient } from "./api/http";
 
 interface MovieDetailsPageProps {
   movie: Film;
@@ -57,8 +57,8 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
         // Приведение типов: seatId (number) -> ticket.seatId (string)
         const ticket = tickets.find((t) => t.seatId === String(seatId));
         if (ticket) {
-          await axios.post(
-            `${API_BASE_URL}/tickets/${ticket.id}/reserve`,
+          await httpClient.post(
+            `/tickets/${ticket.id}/reserve`,
             {},
             { headers: { Authorization: `Bearer ${token}` } }
           );
@@ -71,8 +71,8 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
         .map((id) => tickets.find((t) => t.seatId === String(id))?.id)
         .filter((id): id is string => id !== undefined);
 
-      const res = await axios.post(
-        `${API_BASE_URL}/purchases`,
+      const res = await httpClient.post(
+        `/purchases`,
         { ticketIds: ticketIdsForPurchase },
         { headers: { Authorization: `Bearer ${token}` } }
       );

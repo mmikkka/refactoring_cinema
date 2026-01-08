@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import axios from "axios";
+import { httpClient } from "./api/http";
 
 interface Review {
   id: number;
@@ -23,12 +23,9 @@ export default function ReviewsDisplay({ movieId }: Props) {
     const fetchReviews = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(
-          `http://91.142.94.183:8080/films/${movieId}/reviews`,
-          {
-            params: { page: 0, size: 20 },
-          }
-        );
+        const response = await httpClient.get(`/films/${movieId}/reviews`, {
+          params: { page: 0, size: 20 },
+        });
         setReviews(response.data.data || []);
       } catch (err) {
         console.error(err);
