@@ -165,17 +165,17 @@ describe("MovieDetailsPage (Full Suite)", () => {
       .mockResolvedValueOnce({ data: mockPurchase });
 
     fireEvent.click(screen.getByRole("button", { name: /Забронировать/i }));
+
     await waitFor(() => {
-      expect(httpClient.post).toHaveBeenCalledWith(
+      expect(httpClient.post).toHaveBeenNthCalledWith(
+        1,
         "/tickets/t1/reserve",
-        {},
-        expect.any(Object)
+        {}
       );
-      expect(httpClient.post).toHaveBeenCalledWith(
-        "/purchases",
-        { ticketIds: ["t1"] },
-        expect.any(Object)
-      );
+
+      expect(httpClient.post).toHaveBeenNthCalledWith(2, "/purchases", {
+        ticketIds: ["t1"],
+      });
     });
   });
 
