@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { usePeriodicSessions, type Period } from "../hooks/usePeriodicSessions";
 import { PeriodicSessionSettings } from "./PeriodicSessionSettings";
 import { httpClient } from "../api/http";
+import type { BaseFormProps } from "../types/forms";
 
 interface Movie {
   id: string;
@@ -34,63 +35,42 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [editing, setEditing] = useState<Session | null>(null);
 
-  useEffect(() => {
-    if (!token) return;
+  const fetchInitialData = async () => {
+    try {
+      const [filmsRes, hallsRes] = await Promise.all([
+        httpClient.get("/films?page=0&size=50"),
+        httpClient.get("/halls"),
+      ]);
+      setMovies(filmsRes.data.data || []);
+      setHalls(hallsRes.data.data || []);
+    } catch (err) {
+      console.error("Ошибка загрузки данных:", err);
+    }
+  };
 
-    fetch(`${httpClient}/films?page=0&size=50`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setMovies(data.data || []))
-      .catch(console.error);
-
-    fetch(`${httpClient}/halls`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setHalls(data.data || []))
-      .catch(console.error);
-  }, [token]);
-
-  const fetchSessions = () => {
-    if (!token) return;
-    fetch(`${httpClient}/sessions?page=0&size=50`, {
-      headers: { Authorization: `Bearer ${token}` },
-    })
-      .then((res) => res.json())
-      .then((data) => setSessions(data.data || []))
-      .catch(console.error);
+  const fetchSessions = async () => {
+    try {
+      const res = await httpClient.get("/sessions?page=0&size=50");
+      setSessions(res.data.data || []);
+    } catch (err) {
+      console.error("Ошибка загрузки сеансов:", err);
+    }
   };
 
   useEffect(() => {
-    fetchSessions();
+    if (token) {
+      fetchInitialData();
+      fetchSessions();
+    }
   }, [token]);
 
   const handleSave = async (session: Session) => {
-    if (!token) return;
-
     try {
-      const method = session.id ? "PUT" : "POST";
-      const url = session.id
-        ? `${httpClient}/sessions/${session.id}`
-        : `${httpClient}/sessions`;
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          filmId: session.filmId,
-          hallId: session.hallId,
-          startAt: session.startAt,
-          periodicConfig: session.periodicConfig || null,
-        }),
-      });
-
-      if (!res.ok) throw new Error("Ошибка при сохранении сеанса");
-
+      if (session.id) {
+        await httpClient.put(`/sessions/${session.id}`, session);
+      } else {
+        await httpClient.post("/sessions", session);
+      }
       await fetchSessions();
       setEditing(null);
     } catch (err) {
@@ -100,22 +80,17 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
   };
 
   const handleDelete = async (id: string) => {
-    if (!token || !window.confirm("Удалить этот сеанс?")) return;
+    if (!window.confirm("Удалить этот сеанс?")) return;
     try {
-      const res = await fetch(`${httpClient}/sessions/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Ошибка при удалении сеанса");
+      await httpClient.delete(`/sessions/${id}`);
       setSessions(sessions.filter((s) => s.id !== id));
     } catch (err) {
       console.error(err);
-      alert("Не удалось удалить сеанс");
     }
   };
 
   return (
-    <div className="container-fluid">
+    <div className="container-fluid mt-3">
       <h2 className="text-primary mb-4">🎬 Управление сеансами</h2>
 
       <button
@@ -135,77 +110,70 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
 
       {editing && (
         <SessionForm
-          session={editing}
-          movies={movies}
-          halls={halls}
+          data={editing}
+          metadata={{ movies, halls }}
           onSave={handleSave}
           onCancel={() => setEditing(null)}
         />
       )}
 
-      {sessions.length === 0 ? (
-        <p>Сеансов пока нет.</p>
-      ) : (
-        <div className="row">
-          {sessions.map((s) => (
-            <div key={s.id} className="col-md-6 mb-3">
-              <div className="card shadow-sm p-3 text-light">
-                <strong>
-                  {movies.find((m) => m.id === s.filmId)?.title || s.filmId}
-                </strong>{" "}
-                —{" "}
-                <em>
-                  {halls.find((h) => h.id === s.hallId)?.name || s.hallId}
-                </em>
-                <div>🕒 {new Date(s.startAt).toLocaleString()}</div>
-                {s.periodicConfig && (
-                  <div className="text-info small mt-1">
-                    🔁{" "}
-                    {s.periodicConfig.period === "EVERY_DAY"
-                      ? "Ежедневно"
-                      : "Еженедельно"}{" "}
-                    до{" "}
-                    {new Date(
-                      s.periodicConfig.periodGenerationEndsAt
-                    ).toLocaleDateString("ru-RU")}
-                  </div>
-                )}
-                <div className="mt-2 d-flex justify-content-between">
-                  <button
-                    className="btn btn-warning btn-sm"
-                    onClick={() => setEditing(s)}
-                  >
-                    ✏ Редактировать
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleDelete(s.id)}
-                  >
-                    🗑 Удалить
-                  </button>
-                </div>
+      <div className="row">
+        {sessions.map((s) => (
+          <div key={s.id} className="col-md-6 mb-3">
+            <div className="card shadow-sm p-3 bg-secondary text-light">
+              <strong>
+                {movies.find((m) => m.id === s.filmId)?.title || "Загрузка..."}
+              </strong>
+              <span className="mx-2">—</span>
+              <em>
+                {halls.find((h) => h.id === s.hallId)?.name || "Загрузка..."}
+              </em>
+              <div className="mt-2">
+                🕒 {new Date(s.startAt).toLocaleString()}
+              </div>
+              <div className="mt-3 d-flex gap-2">
+                <button
+                  className="btn btn-warning btn-sm"
+                  onClick={() => setEditing(s)}
+                >
+                  ✏ Редактировать
+                </button>
+                <button
+                  className="btn btn-danger btn-sm"
+                  onClick={() => handleDelete(s.id)}
+                >
+                  🗑 Удалить
+                </button>
               </div>
             </div>
-          ))}
-        </div>
-      )}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
 
-interface SessionFormProps {
-  session: Session;
-  movies: Movie[];
-  halls: Hall[];
-  onSave: (session: Session) => void;
-  onCancel: () => void;
-}
+function SessionForm({
+  data: session,
+  onSave,
+  onCancel,
+  metadata,
+}: BaseFormProps<Session>) {
+  const { movies, halls } = (metadata || {}) as {
+    movies: Movie[];
+    halls: Hall[];
+  };
 
-function SessionForm({ session, onSave, onCancel }: SessionFormProps) {
   const [form, setForm] = useState(session);
-  const [isPeriodic, setIsPeriodic] = useState(false);
-  const [period, setPeriod] = useState<Period>("EVERY_DAY");
-  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
+
+  // Состояния для периодичности
+  const [isPeriodic, setIsPeriodic] = useState(!!session.periodicConfig);
+  const [period, setPeriod] = useState<Period>(
+    session.periodicConfig?.period || "EVERY_DAY"
+  );
+  const [periodEnd, setPeriodEnd] = useState<string | null>(
+    session.periodicConfig?.periodGenerationEndsAt || null
+  );
 
   const { sessionCount } = usePeriodicSessions({
     startAt: form.startAt,
@@ -226,31 +194,49 @@ function SessionForm({ session, onSave, onCancel }: SessionFormProps) {
       alert("Выберите дату окончания периода");
       return;
     }
-
     onSave({
       ...form,
       periodicConfig: isPeriodic
-        ? {
-            period,
-            periodGenerationEndsAt: periodEnd!,
-          }
+        ? { period, periodGenerationEndsAt: periodEnd! }
         : null,
     });
   };
 
   return (
-    <div className="card p-3 mb-4 shadow-sm">
+    <div className="card p-4 mb-4 shadow text-dark">
       <h5 className="mb-3 text-primary">
-        {session.id ? "Редактирование сеанса" : "Новый сеанс"}
+        {session.id ? "Редактирование" : "Новый сеанс"}
       </h5>
+
+      <label className="small fw-bold">Фильм:</label>
       <select
         name="filmId"
         value={form.filmId}
         onChange={handleChange}
-        className="form-control mb-2"
-      />
+        className="form-select mb-2"
+      >
+        {movies.map((m: Movie) => (
+          <option key={m.id} value={m.id}>
+            {m.title}
+          </option>
+        ))}
+      </select>
 
-      <label className="text-light ">Дата и время начала:</label>
+      <label className="small fw-bold">Зал:</label>
+      <select
+        name="hallId"
+        value={form.hallId}
+        onChange={handleChange}
+        className="form-select mb-2"
+      >
+        {halls.map((h: Hall) => (
+          <option key={h.id} value={h.id}>
+            {h.name}
+          </option>
+        ))}
+      </select>
+
+      <label className="small fw-bold">Дата и время начала:</label>
       <input
         className="form-control mb-3"
         type="datetime-local"
@@ -269,9 +255,9 @@ function SessionForm({ session, onSave, onCancel }: SessionFormProps) {
         sessionCount={sessionCount}
       />
 
-      <div className="d-flex justify-content-end mt-3">
-        <button className="btn btn-success me-2" onClick={handleSubmit}>
-          Сохранить
+      <div className="d-flex justify-content-end mt-3 gap-2">
+        <button className="btn btn-success" onClick={handleSubmit}>
+          💾 Сохранить
         </button>
         <button className="btn btn-secondary" onClick={onCancel}>
           Отмена

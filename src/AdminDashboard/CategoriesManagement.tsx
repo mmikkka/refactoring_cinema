@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { httpClient } from "../api/http";
+import type { BaseFormProps } from "../types/forms";
 
 interface Category {
   id?: string;
@@ -17,15 +18,12 @@ export default function CategoriesManagement({
   const [categories, setCategories] = useState<Category[]>([]);
   const [editing, setEditing] = useState<Category | null>(null);
 
-  // Загрузка категорий
   const fetchCategories = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${httpClient}/seat-categories?page=0&size=20`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setCategories(data.data || []);
+      // Используем httpClient.get вместо fetch, раз мы его настроили
+      const res = await httpClient.get("/seat-categories?page=0&size=20");
+      setCategories(res.data.data || []);
     } catch (err) {
       console.error("Ошибка загрузки категорий:", err);
     }
@@ -35,43 +33,25 @@ export default function CategoriesManagement({
     fetchCategories();
   }, [token]);
 
-  // Создание / редактирование категории
   const handleSave = async (cat: Category) => {
     if (!token) return;
-    if (!cat.name.trim()) return alert("Введите название категории");
-    if (cat.priceCents <= 0) return alert("Цена должна быть больше 0");
-
     try {
-      const method = cat.id ? "PUT" : "POST";
-      const url = cat.id
-        ? `${httpClient}/seat-categories/${cat.id}`
-        : `${httpClient}/seat-categories`;
-
-      await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(cat),
-      });
-
-      await fetchCategories();
+      if (cat.id) {
+        await httpClient.put(`/seat-categories/${cat.id}`, cat);
+      } else {
+        await httpClient.post("/seat-categories", cat);
+      }
+      await fetchCategories(); // Обязательно рефетч
       setEditing(null);
     } catch (err) {
-      console.error(err);
       alert("Не удалось сохранить категорию");
     }
   };
 
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить эту категорию?")) return;
-
     try {
-      await fetch(`${httpClient}/seat-categories/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await httpClient.delete(`/seat-categories/${id}`);
       setCategories(categories.filter((c) => c.id !== id));
     } catch (err) {
       console.error(err);
@@ -92,7 +72,7 @@ export default function CategoriesManagement({
 
       {editing && (
         <CategoryForm
-          category={editing}
+          data={editing}
           onSave={handleSave}
           onCancel={() => setEditing(null)}
         />
@@ -128,13 +108,12 @@ export default function CategoriesManagement({
   );
 }
 
-interface CategoryFormProps {
-  category: Category;
-  onSave: (cat: Category) => void;
-  onCancel: () => void;
-}
-
-function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) {
+// Компонент формы теперь строго следует интерфейсу BaseFormProps
+function CategoryForm({
+  data: category,
+  onSave,
+  onCancel,
+}: BaseFormProps<Category>) {
   const [form, setForm] = useState(category);
 
   useEffect(() => {
@@ -145,12 +124,12 @@ function CategoryForm({ category, onSave, onCancel }: CategoryFormProps) {
     const { name, value } = e.target;
     setForm({
       ...form,
-      [name]: name === "priceCents" ? Number(value) * 100 : value,
+      [name]: name === "priceCents" ? Number(value) : value,
     });
   };
 
   return (
-    <div className="card p-3 mb-3">
+    <div className="card p-3 mb-3 text-dark">
       <h5>{category.id ? "Редактирование категории" : "Новая категория"}</h5>
 
       <input

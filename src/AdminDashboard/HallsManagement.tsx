@@ -1,132 +1,49 @@
 import React, { useEffect, useState } from "react";
 import { httpClient } from "../api/http";
-
-interface Seat {
-  row: number;
-  number: number;
-  categoryId: string;
-}
-
-interface Row {
-  id: number;
-  rowNumber: number;
-  seatsCount: number;
-  categoryId: string;
-}
+import type { BaseFormProps } from "../types/forms";
 
 interface Hall {
   id?: string;
   name: string;
-  number: number;
-  rows: Row[];
+  description?: string;
 }
 
-interface SeatCategory {
-  id: string;
-  name: string;
-}
-
-interface HallsManagementProps {
-  token: string;
-}
-
-export default function HallsManagement({ token }: HallsManagementProps) {
+export default function HallsManagement() {
   const [halls, setHalls] = useState<Hall[]>([]);
   const [editing, setEditing] = useState<Hall | null>(null);
-  const [categories, setCategories] = useState<SeatCategory[]>([]);
 
-  // ✅ Загрузка залов
   const fetchHalls = async () => {
-    if (!token) return;
     try {
-      const res = await fetch(`${httpClient}/halls`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      const safeHalls = (data.data || []).map((h: any) => ({
-        ...h,
-        rows: h.rows || [],
-      }));
-      setHalls(safeHalls);
+      const res = await httpClient.get("/halls");
+      setHalls(res.data.data || res.data || []);
     } catch (err) {
-      console.error(err);
-    }
-  };
-
-  // ✅ Загрузка категорий мест
-  const fetchCategories = async () => {
-    if (!token) return;
-    try {
-      const res = await fetch(`${httpClient}/seat-categories?page=0&size=50`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      setCategories(data.data || []);
-    } catch (err) {
-      console.error(err);
+      console.error("Ошибка загрузки залов:", err);
     }
   };
 
   useEffect(() => {
     fetchHalls();
-    fetchCategories();
-  }, [token]);
+  }, []);
 
-  // ✅ Сохранение зала
   const handleSave = async (hall: Hall) => {
-    if (!token) return;
     try {
-      const method = hall.id ? "PUT" : "POST";
-      const url = hall.id
-        ? `${httpClient}/halls/${hall.id}`
-        : `${httpClient}/halls`;
-
-      // 🔹 Генерируем плоский массив мест
-      const seats: Seat[] = [];
-      hall.rows.forEach((row, i) => {
-        for (let j = 0; j < row.seatsCount; j++) {
-          seats.push({
-            row: i + 1,
-            number: j + 1,
-            categoryId: row.categoryId,
-          });
-        }
-      });
-
-      const safeHall = {
-        name: hall.name,
-        number: hall.number,
-        rows: hall.rows.length,
-        seats,
-      };
-
-      const res = await fetch(url, {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(safeHall),
-      });
-
-      if (!res.ok) throw new Error("Ошибка при сохранении зала");
+      if (hall.id) {
+        await httpClient.put(`/halls/${hall.id}`, hall);
+      } else {
+        await httpClient.post("/halls", hall);
+      }
       await fetchHalls();
       setEditing(null);
     } catch (err) {
       console.error(err);
-      alert("Не удалось сохранить зал");
+      alert("Ошибка сохранения");
     }
   };
 
-  // ✅ Удаление зала
   const handleDelete = async (id: string) => {
-    if (!token || !window.confirm("Удалить этот зал?")) return;
+    if (!window.confirm("Удалить этот зал?")) return;
     try {
-      const res = await fetch(`${httpClient}/halls/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Ошибка при удалении зала");
+      await httpClient.delete(`/halls/${id}`);
       setHalls(halls.filter((h) => h.id !== id));
     } catch (err) {
       console.error(err);
@@ -135,171 +52,111 @@ export default function HallsManagement({ token }: HallsManagementProps) {
   };
 
   return (
-    <div className="container-fluid">
-      <h2 className="text-primary mb-4">Управление залами</h2>
+    <div className="container mt-3 text-light">
+      <h2 className="mb-3">🏛 Управление залами</h2>
 
       <button
-        className="btn btn-success mb-3"
-        onClick={() => setEditing({ name: "", number: 1, rows: [] })}
+        className="btn btn-primary mb-3"
+        onClick={() => setEditing({ name: "", description: "" })}
       >
         ➕ Добавить зал
       </button>
 
       {editing && (
         <HallForm
-          hall={editing}
-          categories={categories}
+          data={editing}
           onSave={handleSave}
           onCancel={() => setEditing(null)}
         />
       )}
 
-      {halls.length === 0 ? (
-        <p>Залов пока нет.</p>
-      ) : (
-        <div className="row">
-          {halls.map((h) => (
-            <div key={h.id} className="col-md-6 mb-3">
-              <div className="card shadow-sm p-3 text-light">
-                <strong>{h.name}</strong> — №{h.number} | {h.rows.length} рядов
-                <div className="mt-2 d-flex justify-content-between">
-                  <button
-                    className="btn btn-warning btn-sm"
-                    onClick={() => setEditing(h)}
-                  >
-                    Редактировать
-                  </button>
-                  <button
-                    className="btn btn-danger btn-sm"
-                    onClick={() => handleDelete(h.id!)}
-                  >
-                    Удалить
-                  </button>
-                </div>
-              </div>
+      <ul className="list-group">
+        {halls.map((h) => (
+          <li
+            key={h.id}
+            className="list-group-item bg-dark text-light border-secondary d-flex justify-content-between align-items-center"
+          >
+            <div>
+              <strong>{h.name}</strong>
+              {h.description && (
+                <div className="small text-secondary">{h.description}</div>
+              )}
             </div>
-          ))}
-        </div>
-      )}
+            <span>
+              <button
+                className="btn btn-sm btn-warning me-2"
+                onClick={() => setEditing(h)}
+              >
+                ✏️
+              </button>
+              <button
+                className="btn btn-sm btn-danger"
+                onClick={() => handleDelete(h.id!)}
+              >
+                🗑
+              </button>
+            </span>
+          </li>
+        ))}
+        {halls.length === 0 && (
+          <li className="list-group-item bg-transparent text-secondary">
+            Залы не найдены
+          </li>
+        )}
+      </ul>
     </div>
   );
 }
 
-interface HallFormProps {
-  hall: Hall;
-  categories: SeatCategory[];
-  onSave: (hall: Hall) => void;
-  onCancel: () => void;
-}
+function HallForm({ data: hall, onSave, onCancel }: BaseFormProps<Hall>) {
+  const [form, setForm] = useState(hall);
 
-function HallForm({ hall, categories, onSave, onCancel }: HallFormProps) {
-  const [form, setForm] = useState<Hall>({ ...hall, rows: hall.rows || [] });
+  // Синхронизируем состояние формы, если data изменилась извне
+  useEffect(() => {
+    setForm(hall);
+  }, [hall]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setForm({ ...form, [name]: name === "number" ? Number(value) : value });
-  };
-
-  const addRow = () => {
-    setForm({
-      ...form,
-      rows: [
-        ...form.rows,
-        {
-          id: Date.now(),
-          rowNumber: form.rows.length + 1,
-          seatsCount: 1,
-          categoryId: categories[0]?.id || "",
-        },
-      ],
-    });
-  };
-
-  const removeRow = (id: number) => {
-    setForm({ ...form, rows: form.rows.filter((r) => r.id !== id) });
-  };
-
-  const handleRowChange = (
-    id: number,
-    seatsCount: number,
-    categoryId: string
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
   ) => {
-    setForm({
-      ...form,
-      rows: form.rows.map((r) =>
-        r.id === id ? { ...r, seatsCount, categoryId } : r
-      ),
-    });
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
   return (
-    <div className="card p-3 mb-4 shadow-sm">
-      <h5 className="mb-3 text-primary">
-        {hall.id ? "Редактирование зала" : "Новый зал"}
-      </h5>
+    <div className="card p-3 mb-3 text-dark shadow">
+      <h5>{hall.id ? "Редактирование зала" : "Новый зал"}</h5>
 
-      <input
-        className="form-control mb-2 "
-        name="name"
-        value={form.name}
-        onChange={handleChange}
-        placeholder="Название зала"
-      />
-      <input
-        className="form-control mb-2"
-        name="number"
-        type="number"
-        value={form.number}
-        onChange={handleChange}
-        placeholder="Номер зала"
-      />
+      <div className="mb-2">
+        <label className="form-label small fw-bold">Название:</label>
+        <input
+          className="form-control"
+          name="name"
+          value={form.name}
+          onChange={handleChange}
+          placeholder="Например: Синий зал"
+        />
+      </div>
 
-      <h6 className="text-light">Ряды и количество мест:</h6>
-      {form.rows.map((row) => (
-        <div key={row.id} className="d-flex align-items-center mb-2">
-          <span className="me-2 text-light ">Ряд {row.rowNumber}:</span>
-          <input
-            type="number"
-            className="form-control me-2"
-            style={{ width: "100px" }}
-            value={row.seatsCount}
-            onChange={(e) =>
-              handleRowChange(row.id, Number(e.target.value), row.categoryId)
-            }
-          />
-          <select
-            className="form-control me-2"
-            style={{ width: "200px" }}
-            value={row.categoryId}
-            onChange={(e) =>
-              handleRowChange(row.id, row.seatsCount, e.target.value)
-            }
-          >
-            {categories.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
-          <button
-            className="btn btn-sm btn-danger"
-            onClick={() => removeRow(row.id)}
-          >
-            ✖
-          </button>
-        </div>
-      ))}
+      <div className="mb-3">
+        <label className="form-label small fw-bold">
+          Описание (необязательно):
+        </label>
+        <textarea
+          className="form-control"
+          name="description"
+          value={form.description || ""}
+          onChange={handleChange}
+          placeholder="Особенности зала..."
+        />
+      </div>
 
-      <button className="btn btn-outline-primary mb-3" onClick={addRow}>
-        ➕ Добавить ряд
-      </button>
-
-      <div className="d-flex justify-content-end">
-        <button className="btn btn-success me-2" onClick={() => onSave(form)}>
+      <div className="d-flex gap-2 justify-content-end">
+        <button className="btn btn-success" onClick={() => onSave(form)}>
           💾 Сохранить
         </button>
         <button className="btn btn-secondary" onClick={onCancel}>
-          ✖ Отмена
+          Отмена
         </button>
       </div>
     </div>
