@@ -1,3 +1,5 @@
+import { API_BASE_URL, PLACEHOLDER_POSTER } from "../config";
+
 export interface Film {
   id: number;
   title: string;
@@ -28,7 +30,7 @@ export const MOCK_FILMS: Film[] = [
     description: "Фантастический фильм о путешествиях во времени и пространстве.",
     duration: 169,
     ageRating: "12+",
-    imageUrl: "https://via.placeholder.com/150",
+    imageUrl: `${PLACEHOLDER_POSTER}/150`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -38,7 +40,7 @@ export const MOCK_FILMS: Film[] = [
     description: "Фильм о снах и подсознании, режиссёр Кристофер Нолан.",
     duration: 148,
     ageRating: "12+",
-    imageUrl: "https://via.placeholder.com/150",
+    imageUrl: `${PLACEHOLDER_POSTER}/150`,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   },
@@ -46,7 +48,7 @@ export const MOCK_FILMS: Film[] = [
 
 
 export async function getFilms(): Promise<Film[]> {
-  const res = await fetch("http://91.142.94.183:8080/films");
+  const res = await fetch(`${API_BASE_URL}/films`);
   if (!res.ok) throw new Error("Ошибка загрузки фильмов");
   const json: FilmResponse = await res.json();
   return json.data;
@@ -55,7 +57,7 @@ export async function getFilms(): Promise<Film[]> {
 }
 
 export async function getFilmById(id: string): Promise<Film> {
-  const res = await fetch(`http://91.142.94.183:8080/films/${id}`);
+  const res = await fetch(`${API_BASE_URL}/films/${id}`);
   if (!res.ok) throw new Error("Фильм не найден");
   return res.json();
 }
@@ -97,4 +99,50 @@ export interface Ticket {
   categoryId: string;
   status: "AVAILABLE" | "RESERVED" | "SOLD";
   priceCents: number;
+}
+
+const buildFilmPayload = (film: Partial<Film>) => ({
+  title: film.title,
+  description: film.description,
+  durationMinutes: film.duration, 
+  ageRating: film.ageRating,
+});
+
+export async function createFilm(
+  film: Omit<Film, "id" | "createdAt" | "updatedAt">
+): Promise<Film> {
+  const res = await fetch(`${API_BASE_URL}/films`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildFilmPayload(film)),
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось создать фильм");
+  }
+
+  const json = await res.json();
+  return json as Film;
+}
+
+export async function updateFilm(film: Film): Promise<Film> {
+  if (!film.id) {
+    throw new Error("Нельзя обновить фильм без id");
+  }
+
+  const res = await fetch(`${API_BASE_URL}/films/${film.id}`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(buildFilmPayload(film)),
+  });
+
+  if (!res.ok) {
+    throw new Error("Не удалось обновить фильм");
+  }
+
+  return film;
 }

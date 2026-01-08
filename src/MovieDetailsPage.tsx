@@ -100,7 +100,7 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
         {/* Постер */}
         <div className="col-md-4">
           <img
-            src={movie.imageUrl || `${PLACEHOLDER_POSTER}`}
+            src={movie.imageUrl || `${PLACEHOLDER_POSTER}/300x450`}
             alt={movie.title}
             className="img-fluid rounded shadow"
           />
