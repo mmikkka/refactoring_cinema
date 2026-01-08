@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
-import axios from "axios";
 import type { Session, HallPlan, Ticket } from "../types/movie";
-import { API_BASE_URL, DEFAULT_PAGINATION, MESSAGES } from "../config";
+import { DEFAULT_PAGINATION, MESSAGES } from "../config";
+import { httpClient } from "../api/http";
 
 // Хук для управления сеансами
 export const useMovieSessions = (movieId: number | string) => {
@@ -12,7 +12,7 @@ export const useMovieSessions = (movieId: number | string) => {
     const fetchSessions = async () => {
       try {
         setLoading(true);
-        const res = await axios.get(`${API_BASE_URL}/sessions`, {
+        const res = await httpClient.get(`/sessions`, {
           params: { 
             ...DEFAULT_PAGINATION, 
             filmId: movieId 
@@ -42,11 +42,12 @@ export const useHallData = (sessionId: number | undefined) => {
     try {
       setLoading(true);
       const [planRes, ticketsRes] = await Promise.all([
-        axios.get(`${API_BASE_URL}/halls/${sessionId}/plan`), 
-        axios.get(`${API_BASE_URL}/sessions/${sessionId}/tickets`),
+        httpClient.get(`/halls/${sessionId}/plan`), 
+        httpClient.get(`/sessions/${sessionId}/tickets`),
       ]);
-      setHallPlan(planRes.data);
-      setTickets(ticketsRes.data);
+// Безопасное присвоение
+    if (planRes && planRes.data) setHallPlan(planRes.data);
+    if (ticketsRes && ticketsRes.data) setTickets(ticketsRes.data);
     } catch (err) {
       console.error(MESSAGES.hallError, err);
     } finally {

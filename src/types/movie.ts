@@ -1,4 +1,6 @@
-import { API_BASE_URL, PLACEHOLDER_POSTER } from "../config";
+import { httpClient } from "../api/http";
+import { PLACEHOLDER_POSTER } from "../config";
+
 
 export interface Film {
   id: number;
@@ -48,7 +50,7 @@ export const MOCK_FILMS: Film[] = [
 
 
 export async function getFilms(): Promise<Film[]> {
-  const res = await fetch(`${API_BASE_URL}/films`);
+  const res = await fetch(`${httpClient}/films`);
   if (!res.ok) throw new Error("Ошибка загрузки фильмов");
   const json: FilmResponse = await res.json();
   return json.data;
@@ -57,7 +59,7 @@ export async function getFilms(): Promise<Film[]> {
 }
 
 export async function getFilmById(id: string): Promise<Film> {
-  const res = await fetch(`${API_BASE_URL}/films/${id}`);
+  const res = await fetch(`${httpClient}/films/${id}`);
   if (!res.ok) throw new Error("Фильм не найден");
   return res.json();
 }
@@ -111,7 +113,7 @@ const buildFilmPayload = (film: Partial<Film>) => ({
 export async function createFilm(
   film: Omit<Film, "id" | "createdAt" | "updatedAt">
 ): Promise<Film> {
-  const res = await fetch(`${API_BASE_URL}/films`, {
+  const res = await fetch(`${httpClient}/films`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -132,7 +134,7 @@ export async function updateFilm(film: Film): Promise<Film> {
     throw new Error("Нельзя обновить фильм без id");
   }
 
-  const res = await fetch(`${API_BASE_URL}/films/${film.id}`, {
+  const res = await fetch(`${httpClient}/films/${film.id}`, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",

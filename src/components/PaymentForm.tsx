@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import axios from "axios";
+import { httpClient } from "../api/http";
 
 interface PaymentFormProps {
   purchaseId: number;
@@ -12,8 +12,8 @@ const PaymentForm: React.FC<PaymentFormProps> = ({ purchaseId, onSuccess }) => {
   const handlePay = async () => {
     if (!cardNumber) return alert("Введите номер карты");
     try {
-      await axios.post(
-        "http://91.142.94.183:8080/payments/process",
+      await httpClient.post(
+        "/payments/process",
         {
           purchaseId,
           cardNumber,
