@@ -1,21 +1,13 @@
 import React, { useState } from "react";
-
-// Импорт хуков
 import { useMovieSessions, useHallData } from "./hooks/useMovieDetails";
-
-// Импорт компонентов
 import SessionPicker from "./components/SessionPicker";
 import HallPlanView from "./components/HallPlanView";
 import PaymentForm from "./components/PaymentForm";
 import ReviewsDisplay from "./ReviewsDisplay";
-
-// Импорт типов
+import MovieDisplay from "./components/MovieDisplay";
+import { httpClient } from "./api/http";
 import type { Film, Session } from "./types/movie";
 import type { Purchase } from "./types/user";
-
-// Импорт конфигурации
-import { MESSAGES, PLACEHOLDER_POSTER } from "./config";
-import { httpClient } from "./api/http";
 
 interface MovieDetailsPageProps {
   movie: Film;
@@ -26,7 +18,6 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
   movie,
   onBack,
 }) => {
-  // Состояние
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
@@ -34,10 +25,7 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [purchase, setPurchase] = useState<Purchase | null>(null);
 
-  // Хуки данных
   const { sessions, loading: sessionsLoading } = useMovieSessions(movie.id);
-
-  // Передаем ID сессии, если она выбрана
   const {
     hallPlan,
     tickets,
@@ -45,79 +33,43 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
     refreshTickets,
   } = useHallData(selectedSession?.id);
 
-  // Логика бронирования
   const handleReserve = async () => {
     const token = localStorage.getItem("token");
-    if (!token) return alert(MESSAGES.authRequired);
+    if (!token) return alert("Сначала авторизуйтесь");
 
     try {
-      // 1. Бронируем места по одному
-      // Ищем тикеты, соответствующие выбранным местам
-      for (const seatId of selectedSeats) {
-        // Приведение типов: seatId (number) -> ticket.seatId (string)
-        const ticket = tickets.find((t) => t.seatId === String(seatId));
-        if (ticket) {
-          await httpClient.post(
-            `/tickets/${ticket.id}/reserve`,
-            {},
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
-        }
-      }
-
-      // 2. Создаем покупку
-      // Собираем ID билетов для покупки
-      const ticketIdsForPurchase = selectedSeats
+      const ticketIds = selectedSeats
         .map((id) => tickets.find((t) => t.seatId === String(id))?.id)
-        .filter((id): id is string => id !== undefined);
+        .filter((id): id is string => !!id);
 
-      const res = await httpClient.post(
-        `/purchases`,
-        { ticketIds: ticketIdsForPurchase },
-        { headers: { Authorization: `Bearer ${token}` } }
+      if (ticketIds.length === 0) return;
+
+      await Promise.all(
+        ticketIds.map((id) => httpClient.post(`/tickets/${id}/reserve`, {}))
       );
+
+      const res = await httpClient.post("/purchases", { ticketIds });
 
       setPurchase(res.data);
     } catch (err) {
-      console.error(err);
-      alert(MESSAGES.reserveError);
+      alert("Ошибка при бронировании");
     }
-  };
-
-  const handlePaymentSuccess = () => {
-    setPurchase(null);
-    setSelectedSeats([]);
-    refreshTickets();
   };
 
   return (
     <div className="container py-5 text-light">
       <button className="btn btn-outline-light mb-4" onClick={onBack}>
-        ← Назад
+        ← Назад к списку
       </button>
 
-      <div className="row">
-        {/* Постер */}
-        <div className="col-md-4">
-          <img
-            src={movie.imageUrl || `${PLACEHOLDER_POSTER}/300x450`}
-            alt={movie.title}
-            className="img-fluid rounded shadow"
-          />
-        </div>
+      {/* Верхняя часть: Инфо о фильме */}
+      <MovieDisplay movie={movie} variant="detailed" />
 
-        {/* Основная инфа */}
+      <div className="row mt-5">
+        <div className="col-md-4"></div> {/* Отступ под постером */}
         <div className="col-md-8">
-          <h1 className="display-4 text-primary">{movie.title}</h1>
-          <p>{movie.description}</p>
-          <p>
-            <strong>Жанр:</strong> {movie.genre} | <strong>Рейтинг:</strong>{" "}
-            {movie.ageRating}
-          </p>
+          <h3 className="h4 mb-4 text-warning">Выберите сеанс и места</h3>
 
-          <hr className="bg-light" />
-
-          {/* Компонент выбора сеанса */}
           <SessionPicker
             sessions={sessions}
             selectedDate={selectedDate}
@@ -125,12 +77,11 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
             selectedSessionId={selectedSession?.id}
             onSessionSelect={(s) => {
               setSelectedSession(s);
-              setSelectedSeats([]); // Сброс мест при смене сеанса
+              setSelectedSeats([]);
             }}
             loading={sessionsLoading}
           />
 
-          {/* Компонент схемы зала */}
           {selectedSession && hallPlan && (
             <HallPlanView
               hallPlan={hallPlan}
@@ -147,11 +98,10 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
             />
           )}
 
-          {/* Кнопка "Забронировать" */}
           {selectedSeats.length > 0 && !purchase && (
-            <div className="mt-4 text-center">
+            <div className="mt-4">
               <button
-                className="btn btn-primary btn-xl px-5"
+                className="btn btn-primary btn-lg w-100"
                 onClick={handleReserve}
               >
                 Забронировать ({selectedSeats.length} мест)
@@ -159,17 +109,22 @@ const MovieDetailsPage: React.FC<MovieDetailsPageProps> = ({
             </div>
           )}
 
-          {/* Компонент формы оплаты */}
           {purchase && (
-            <PaymentForm
-              purchaseId={purchase.id}
-              onSuccess={handlePaymentSuccess}
-            />
+            <div className="mt-4">
+              <PaymentForm
+                purchaseId={purchase.id}
+                onSuccess={() => {
+                  setPurchase(null);
+                  setSelectedSeats([]);
+                  refreshTickets();
+                }}
+              />
+            </div>
           )}
         </div>
       </div>
 
-      <div className="mt-5">
+      <div className="mt-5 border-top pt-4 border-secondary">
         <ReviewsDisplay movieId={movie.id} />
       </div>
     </div>
