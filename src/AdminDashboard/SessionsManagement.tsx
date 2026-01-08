@@ -1,4 +1,7 @@
 import React, { useEffect, useState } from "react";
+import { usePeriodicSessions, type Period } from "../hooks/usePeriodicSessions";
+import { PeriodicSessionSettings } from "./PeriodicSessionSettings";
+import { API_BASE_URL } from "../config";
 
 interface Movie {
   id: string;
@@ -34,14 +37,14 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
   useEffect(() => {
     if (!token) return;
 
-    fetch("http://91.142.94.183:8080/films?page=0&size=50", {
+    fetch(`${API_BASE_URL}/films?page=0&size=50`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
       .then((data) => setMovies(data.data || []))
       .catch(console.error);
 
-    fetch("http://91.142.94.183:8080/halls", {
+    fetch(`${API_BASE_URL}/halls`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -49,10 +52,9 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
       .catch(console.error);
   }, [token]);
 
-
   const fetchSessions = () => {
     if (!token) return;
-    fetch("http://91.142.94.183:8080/sessions?page=0&size=50", {
+    fetch(`${API_BASE_URL}/sessions?page=0&size=50`, {
       headers: { Authorization: `Bearer ${token}` },
     })
       .then((res) => res.json())
@@ -70,8 +72,8 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
     try {
       const method = session.id ? "PUT" : "POST";
       const url = session.id
-        ? `http://91.142.94.183:8080/sessions/${session.id}`
-        : "http://91.142.94.183:8080/sessions";
+        ? `${API_BASE_URL}/sessions/${session.id}`
+        : `${API_BASE_URL}/sessions`;
 
       const res = await fetch(url, {
         method,
@@ -100,7 +102,7 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить этот сеанс?")) return;
     try {
-      const res = await fetch(`http://91.142.94.183:8080/sessions/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/sessions/${id}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -148,13 +150,24 @@ export default function SessionsManagement({ token }: SessionsManagementProps) {
           {sessions.map((s) => (
             <div key={s.id} className="col-md-6 mb-3">
               <div className="card shadow-sm p-3 text-light">
-                <strong>{movies.find((m) => m.id === s.filmId)?.title || s.filmId}</strong>{" "}
-                — <em>{halls.find((h) => h.id === s.hallId)?.name || s.hallId}</em>
+                <strong>
+                  {movies.find((m) => m.id === s.filmId)?.title || s.filmId}
+                </strong>{" "}
+                —{" "}
+                <em>
+                  {halls.find((h) => h.id === s.hallId)?.name || s.hallId}
+                </em>
                 <div>🕒 {new Date(s.startAt).toLocaleString()}</div>
                 {s.periodicConfig && (
                   <div className="text-info small mt-1">
-                    🔁 {s.periodicConfig.period === "EVERY_DAY" ? "Ежедневно" : "Еженедельно"} до{" "}
-                    {new Date(s.periodicConfig.periodGenerationEndsAt).toLocaleDateString("ru-RU")}
+                    🔁{" "}
+                    {s.periodicConfig.period === "EVERY_DAY"
+                      ? "Ежедневно"
+                      : "Еженедельно"}{" "}
+                    до{" "}
+                    {new Date(
+                      s.periodicConfig.periodGenerationEndsAt
+                    ).toLocaleDateString("ru-RU")}
                   </div>
                 )}
                 <div className="mt-2 d-flex justify-content-between">
@@ -188,63 +201,54 @@ interface SessionFormProps {
   onCancel: () => void;
 }
 
-function SessionForm({ session, movies, halls, onSave, onCancel }: SessionFormProps) {
+function SessionForm({ session, onSave, onCancel }: SessionFormProps) {
   const [form, setForm] = useState(session);
   const [isPeriodic, setIsPeriodic] = useState(false);
-  const [period, setPeriod] = useState<"EVERY_DAY" | "EVERY_WEEK">("EVERY_DAY");
-  const [periodEnd, setPeriodEnd] = useState("");
-  const [sessionCount, setSessionCount] = useState<number | null>(null);
+  const [period, setPeriod] = useState<Period>("EVERY_DAY");
+  const [periodEnd, setPeriodEnd] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!periodEnd && isPeriodic && form.startAt) {
-      const date = new Date(form.startAt);
-      date.setDate(date.getDate() + 7);
-      setPeriodEnd(date.toISOString().slice(0, 16));
-    }
-  }, [isPeriodic, form.startAt]);
+  const { sessionCount } = usePeriodicSessions({
+    startAt: form.startAt,
+    period,
+    periodEnd,
+    isPeriodic,
+  });
 
-  const handleChange = (e: React.ChangeEvent<HTMLSelectElement | HTMLInputElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
-    setForm({ ...form, [name]: value });
+    setForm((prev) => ({ ...prev, [name]: value }));
   };
 
-  useEffect(() => {
-    if (!isPeriodic || !periodEnd) {
-      setSessionCount(null);
+  const handleSubmit = () => {
+    if (isPeriodic && !periodEnd) {
+      alert("Выберите дату окончания периода");
       return;
     }
 
-    const start = new Date(form.startAt);
-    const end = new Date(periodEnd);
-    if (isNaN(start.getTime()) || isNaN(end.getTime()) || end <= start) {
-      setSessionCount(null);
-      return;
-    }
-
-    const diffDays = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
-    const count =
-      period === "EVERY_DAY"
-        ? Math.floor(diffDays) + 1
-        : Math.floor(diffDays / 7) + 1;
-
-    setSessionCount(count);
-  }, [form.startAt, periodEnd, period, isPeriodic]);
+    onSave({
+      ...form,
+      periodicConfig: isPeriodic
+        ? {
+            period,
+            periodGenerationEndsAt: periodEnd!,
+          }
+        : null,
+    });
+  };
 
   return (
     <div className="card p-3 mb-4 shadow-sm">
-      <h5 className="mb-3 text-primary">{session.id ? "Редактирование сеанса" : "Новый сеанс"}</h5>
-
-      <select name="filmId" value={form.filmId} onChange={handleChange} className="form-control mb-2">
-        {movies.map((m) => (
-          <option key={m.id} value={m.id}>{m.title}</option>
-        ))}
-      </select>
-
-      <select name="hallId" value={form.hallId} onChange={handleChange} className="form-control mb-2">
-        {halls.map((h) => (
-          <option key={h.id} value={h.id}>{h.name}</option>
-        ))}
-      </select>
+      <h5 className="mb-3 text-primary">
+        {session.id ? "Редактирование сеанса" : "Новый сеанс"}
+      </h5>
+      <select
+        name="filmId"
+        value={form.filmId}
+        onChange={handleChange}
+        className="form-control mb-2"
+      />
 
       <label className="text-light ">Дата и время начала:</label>
       <input
@@ -255,66 +259,23 @@ function SessionForm({ session, movies, halls, onSave, onCancel }: SessionFormPr
         onChange={handleChange}
       />
 
-      <div className="form-check ">
-        <input
-          type="checkbox"
-          className="form-check-input"
-          id="periodicCheck"
-          checked={isPeriodic}
-          onChange={() => setIsPeriodic(!isPeriodic)}
-        />
-        <label htmlFor="periodicCheck" className="mb-0 text-light">
-          Повторять сеанс
-        </label>
-      </div>
-
-      {isPeriodic && (
-        <>
-          <select
-            value={period}
-            onChange={(e) => setPeriod(e.target.value as "EVERY_DAY" | "EVERY_WEEK")}
-            className="form-control mb-2"
-          >
-            <option value="EVERY_DAY">Каждый день</option>
-            <option value="EVERY_WEEK">Каждую неделю</option>
-          </select>
-
-          <label className="text-light">До даты:</label>
-          <input
-            className="form-control mb-2"
-            type="datetime-local"
-            value={periodEnd}
-            onChange={(e) => setPeriodEnd(e.target.value)}
-          />
-
-          {sessionCount && (
-            <div className="alert alert-info p-2 mt-2">
-              📅 Будет создано <strong>{sessionCount}</strong>{" "}
-              {sessionCount === 1 ? "сеанс" : "сеансов"} до{" "}
-              {new Date(periodEnd).toLocaleDateString("ru-RU")}
-            </div>
-          )}
-        </>
-      )}
+      <PeriodicSessionSettings
+        isPeriodic={isPeriodic}
+        onTogglePeriodic={setIsPeriodic}
+        period={period}
+        onChangePeriod={setPeriod}
+        periodEnd={periodEnd}
+        onChangePeriodEnd={setPeriodEnd}
+        sessionCount={sessionCount}
+      />
 
       <div className="d-flex justify-content-end mt-3">
-        <button
-          className="btn btn-success me-2"
-          onClick={() =>
-            onSave({
-              ...form,
-              periodicConfig: isPeriodic
-                ? {
-                    period,
-                    periodGenerationEndsAt: new Date(periodEnd).toISOString(),
-                  }
-                : null,
-            } as any)
-          }
-        >
-          💾 Сохранить
+        <button className="btn btn-success me-2" onClick={handleSubmit}>
+          Сохранить
         </button>
-        <button className="btn btn-secondary" onClick={onCancel}>✖ Отмена</button>
+        <button className="btn btn-secondary" onClick={onCancel}>
+          Отмена
+        </button>
       </div>
     </div>
   );
