@@ -76,7 +76,7 @@ describe("HTTP Client Centralization (Shotgun Surgery)", () => {
   });
 
   // 6
-  it("обрабатывает ошибки запроса в интерцепторе", () => {
+  it("обрабатывает ошибки запроса в интерцепторе", async () => {
     const rejectHandler = mockRequestUse.mock.calls[0][1];
     
     if (!rejectHandler) {
@@ -84,7 +84,7 @@ describe("HTTP Client Centralization (Shotgun Surgery)", () => {
     }
     
     const error = new Error("Request failed");
-    expect(rejectHandler(error)).rejects.toThrow("Request failed");
+    await expect(rejectHandler(error)).rejects.toThrow("Request failed");
   });
 
   // 7
