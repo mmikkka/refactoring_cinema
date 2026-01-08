@@ -7,11 +7,10 @@ import LoginPage from "../LoginPage";
 import RegisterPage from "../RegisterPage";
 import UserProfilePage from "../UserProfilePage";
 import AdminDashboard from "../AdminDashboard/AdminDashboard";
-import MovieDetailsWrapper from "./MovieDetailsWrapper"; // Мы уже вынесли его
+import MovieDetailsWrapper from "./MovieDetailsWrapper";
 
-// Обертки защиты
-import { PublicRoute } from "./PublicRoute";
-import { ProtectedRoute } from "./ProtectedRoute";
+// Наш новый унифицированный компонент
+import AccessControlRoute from "./AccessControlRoute";
 
 interface AppRoutesProps {
   token: string | null;
@@ -28,63 +27,69 @@ export const AppRoutes = ({
 }: AppRoutesProps) => {
   return (
     <Routes>
+      {/* 1. Технические и полностью открытые маршруты */}
       <Route
         path={ROUTES.ROOT}
         element={<Navigate to={ROUTES.HOME} replace />}
       />
-
-      {/* --- Публичные маршруты (доступны всем) --- */}
       <Route path={ROUTES.HOME} element={<HomePage />} />
       <Route path={ROUTES.FILM_DETAILS} element={<MovieDetailsWrapper />} />
 
-      {/* --- Гостевые маршруты (только для неавторизованных) --- */}
+      {/* 2. Гостевые маршруты (только для тех, кто НЕ вошел) */}
       <Route
-        path={ROUTES.LOGIN}
         element={
-          <PublicRoute token={token} userRole={userRole}>
-            <LoginPage onLogin={onAuthSuccess} />
-          </PublicRoute>
-        }
-      />
-
-      <Route
-        path={ROUTES.REGISTER}
-        element={
-          <PublicRoute token={token} userRole={userRole}>
-            <RegisterPage onRegister={onAuthSuccess} />
-          </PublicRoute>
-        }
-      />
-
-      {/* --- Защищенные маршруты (USER) --- */}
-      <Route
-        path={ROUTES.PROFILE}
-        element={
-          <ProtectedRoute
+          <AccessControlRoute
+            type="public-only"
             token={token}
             userRole={userRole}
-            requiredRole={UserRole.USER}
-          >
-            <UserProfilePage token={token!} />
-          </ProtectedRoute>
+          />
         }
-      />
+      >
+        <Route
+          path={ROUTES.LOGIN}
+          element={<LoginPage onLogin={onAuthSuccess} />}
+        />
+        <Route
+          path={ROUTES.REGISTER}
+          element={<RegisterPage onRegister={onAuthSuccess} />}
+        />
+      </Route>
 
-      {/* --- Защищенные маршруты (ADMIN) --- */}
+      {/* 3. Защищенные маршруты для обычных пользователей */}
       <Route
-        path={ROUTES.ADMIN}
         element={
-          <ProtectedRoute
+          <AccessControlRoute
+            type="protected"
             token={token}
             userRole={userRole}
-            requiredRole={UserRole.ADMIN}
-          >
-            <AdminDashboard onBack={onLogout} />
-          </ProtectedRoute>
+            allowedRole={UserRole.USER}
+          />
         }
-      />
+      >
+        <Route
+          path={ROUTES.PROFILE}
+          element={<UserProfilePage token={token!} />}
+        />
+      </Route>
 
-      {/* --- Fallback для неизвестных путей --- */}
+      {/* 4. Защищенные маршруты для админов */}
+      <Route
+        element={
+          <AccessControlRoute
+            type="protected"
+            token={token}
+            userRole={userRole}
+            allowedRole={UserRole.ADMIN}
+          />
+        }
+      >
+        <Route
+          path={ROUTES.ADMIN}
+          element={<AdminDashboard onBack={onLogout} />}
+        />
+      </Route>
+
+      {/* Fallback */}
       <Route path="*" element={<Navigate to={ROUTES.ROOT} replace />} />
     </Routes>
   );
