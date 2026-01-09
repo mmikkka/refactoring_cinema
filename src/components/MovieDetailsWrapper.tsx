@@ -34,6 +34,6 @@ function MovieDetailsWrapper() {
     });
   };
 
-  return <MovieDetailsPage film={film} onSelectSession={handleSelectSession} />;
+  return <MovieDetailsPage movie={film} onBack={() => handleSelectSession} />;
 }
 export default MovieDetailsWrapper;

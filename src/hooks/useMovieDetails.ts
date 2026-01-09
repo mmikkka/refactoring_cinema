@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import type { Session, HallPlan, Ticket } from "../types/movie";
-import { DEFAULT_PAGINATION, MESSAGES } from "../config";
-import { httpClient } from "../api/http";
+import { MESSAGES } from "../config";
+//DEFAULT_PAGINATION,
+//import { httpClient } from "../api/http";
 
 // Хук для управления сеансами
 export const useMovieSessions = (movieId: number | string) => {
@@ -12,6 +13,7 @@ export const useMovieSessions = (movieId: number | string) => {
     const fetchSessions = async () => {
       try {
         setLoading(true);
+        /* // СТАРЫЙ КОД ЗАПРОСА
         const res = await httpClient.get(`/sessions`, {
           params: { 
             ...DEFAULT_PAGINATION, 
@@ -19,6 +21,17 @@ export const useMovieSessions = (movieId: number | string) => {
           },
         });
         setSessions(res.data.data || []);
+        */
+
+        // МОКОВЫЕ ДАННЫЕ СЕАНСОВ
+        await new Promise(resolve => setTimeout(resolve, 400));
+        const mockSessions: Session[] = [
+          { id: 101, movieId: Number(movieId), hallId: 1, date: "2026-01-09", time: "10:00", startAt: "" },
+          { id: 102, movieId: Number(movieId), hallId: 2, date: "2026-01-09", time: "10:00", startAt: "" },
+          { id: 103, movieId: Number(movieId), hallId: 1, date: "2026-01-09", time: "10:00", startAt: "" },
+        ];
+        setSessions(mockSessions);
+
       } catch (err) {
         console.error(MESSAGES.sessionError, err);
       } finally {
@@ -41,13 +54,30 @@ export const useHallData = (sessionId: number | undefined) => {
     if (!sessionId) return;
     try {
       setLoading(true);
+
+      /* // СТАРЫЙ КОД ЗАПРОСА
       const [planRes, ticketsRes] = await Promise.all([
         httpClient.get(`/halls/${sessionId}/plan`), 
         httpClient.get(`/sessions/${sessionId}/tickets`),
       ]);
-// Безопасное присвоение
-    if (planRes && planRes.data) setHallPlan(planRes.data);
-    if (ticketsRes && ticketsRes.data) setTickets(ticketsRes.data);
+      if (planRes && planRes.data) setHallPlan(planRes.data);
+      if (ticketsRes && ticketsRes.data) setTickets(ticketsRes.data);
+      */
+
+      // МОКОВЫЕ ДАННЫЕ ЗАЛА
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setHallPlan({
+        hallId: "1",
+        rows: 5,
+        categories: [{ id: "VIP", name: "VIP", priceCents: 100000 }],
+        seats: [
+           { id: 1, row: 1, number: 1, category: "Standard", price: 500, isTaken: false },
+           { id: 2, row: 1, number: 2, category: "Standard", price: 500, isTaken: true }
+        ]
+      });
+      setTickets([]); // Пока пусто, чтобы не было ошибок
+
     } catch (err) {
       console.error(MESSAGES.hallError, err);
     } finally {

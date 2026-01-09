@@ -35,12 +35,12 @@ export default function MoviesManagement({ token }: MoviesManagementProps) {
   const fetchMovies = async () => {
     if (!token) return;
     try {
-      const res = await fetch(`${httpClient}/films?page=0&size=20`, {
+      const res = await httpClient.get("/films?page=0&size=20", {
+        params: { page: 0, size: 20 },
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data = await res.json();
 
-      const uiMovies: Movie[] = data.data.map((f: any) => ({
+      const uiMovies: Movie[] = res.data.data.map((f: any) => ({
         id: String(f.id),
         title: f.title,
         description: f.description,
@@ -80,10 +80,7 @@ export default function MoviesManagement({ token }: MoviesManagementProps) {
   const handleDelete = async (id: string) => {
     if (!token || !window.confirm("Удалить этот фильм?")) return;
     try {
-      await fetch(`${httpClient}/films/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await httpClient.delete(`/films/${id}`);
       setMovies((prev) => prev.filter((m) => m.id !== id));
     } catch (err) {
       console.error("Ошибка удаления фильма:", err);

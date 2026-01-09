@@ -48,20 +48,27 @@ export const MOCK_FILMS: Film[] = [
   },
 ];
 
-
 export async function getFilms(): Promise<Film[]> {
-  const res = await fetch(`${httpClient}/films`);
-  if (!res.ok) throw new Error("Ошибка загрузки фильмов");
-  const json: FilmResponse = await res.json();
-  return json.data;
+  // const res = await httpClient.get<FilmResponse>("/films");
+  // if (res.status < 200 || res.status >= 300) throw new Error("Ошибка загрузки фильмов");
+  // return res.data.data;
   return new Promise(resolve => setTimeout(() => resolve(MOCK_FILMS), 300));
   
 }
 
 export async function getFilmById(id: string): Promise<Film> {
-  const res = await fetch(`${httpClient}/films/${id}`);
-  if (!res.ok) throw new Error("Фильм не найден");
-  return res.json();
+  // const res = await httpClient.get<Film>(`/films/${id}`);
+  // if (res.status < 200 || res.status >= 300) throw new Error("Фильм не найден");
+  // return res.data;
+
+  // Эмулируем поиск фильма по ID в моках
+  const film = MOCK_FILMS.find(f => f.id === Number(id));
+  
+  if (!film) {
+    throw new Error("Фильм не найден в моках");
+  }
+  
+  return new Promise(resolve => setTimeout(() => resolve(film), 300));
 }
 
 export interface Session {
@@ -113,20 +120,11 @@ const buildFilmPayload = (film: Partial<Film>) => ({
 export async function createFilm(
   film: Omit<Film, "id" | "createdAt" | "updatedAt">
 ): Promise<Film> {
-  const res = await fetch(`${httpClient}/films`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(buildFilmPayload(film)),
-  });
-
-  if (!res.ok) {
+  const res = await httpClient.post<Film>("/films", buildFilmPayload(film));
+  if (res.status < 200 || res.status >= 300) {
     throw new Error("Не удалось создать фильм");
   }
-
-  const json = await res.json();
-  return json as Film;
+  return res.data;
 }
 
 export async function updateFilm(film: Film): Promise<Film> {
@@ -134,17 +132,10 @@ export async function updateFilm(film: Film): Promise<Film> {
     throw new Error("Нельзя обновить фильм без id");
   }
 
-  const res = await fetch(`${httpClient}/films/${film.id}`, {
-    method: "PUT",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(buildFilmPayload(film)),
-  });
-
-  if (!res.ok) {
+  const res = await httpClient.put<Film>(`/films/${film.id}`, buildFilmPayload(film));
+  if (res.status < 200 || res.status >= 300) {
     throw new Error("Не удалось обновить фильм");
   }
 
-  return film;
+  return res.data;
 }

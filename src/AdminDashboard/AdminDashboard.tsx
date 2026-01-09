@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import MoviesManagement from "./MoviesManagement";
 import HallsManagement from "./HallsManagement";
 import CategoriesManagement from "./CategoriesManagement";
@@ -9,7 +9,9 @@ interface AdminPanelProps {
 }
 
 export default function AdminDashboard({ onBack }: AdminPanelProps) {
-  const [section, setSection] = useState<"movies" | "halls" | "categories" | "sessions">("movies");
+  const [section, setSection] = useState<
+    "movies" | "halls" | "categories" | "sessions"
+  >("movies");
   const [token, setToken] = useState<string>("");
 
   useEffect(() => {
@@ -20,7 +22,9 @@ export default function AdminDashboard({ onBack }: AdminPanelProps) {
   if (!token) {
     return (
       <div className="container p-4">
-        <p className="text-danger">Требуется авторизация. Пожалуйста, войдите.</p>
+        <p className="text-danger">
+          Требуется авторизация. Пожалуйста, войдите.
+        </p>
         <button className="btn btn-primary" onClick={onBack}>
           ⬅ Назад
         </button>
@@ -38,7 +42,9 @@ export default function AdminDashboard({ onBack }: AdminPanelProps) {
         <ul className="list-unstyled">
           <li className="mb-2">
             <button
-              className={`btn w-100 ${section === "movies" ? "btn-primary" : "btn-outline-light"}`}
+              className={`btn w-100 ${
+                section === "movies" ? "btn-primary" : "btn-outline-light"
+              }`}
               onClick={() => setSection("movies")}
             >
               Фильмы
@@ -46,7 +52,9 @@ export default function AdminDashboard({ onBack }: AdminPanelProps) {
           </li>
           <li className="mb-2">
             <button
-              className={`btn w-100 ${section === "halls" ? "btn-primary" : "btn-outline-light"}`}
+              className={`btn w-100 ${
+                section === "halls" ? "btn-primary" : "btn-outline-light"
+              }`}
               onClick={() => setSection("halls")}
             >
               Залы
@@ -54,7 +62,9 @@ export default function AdminDashboard({ onBack }: AdminPanelProps) {
           </li>
           <li className="mb-2">
             <button
-              className={`btn w-100 ${section === "categories" ? "btn-primary" : "btn-outline-light"}`}
+              className={`btn w-100 ${
+                section === "categories" ? "btn-primary" : "btn-outline-light"
+              }`}
               onClick={() => setSection("categories")}
             >
               Категории
@@ -62,21 +72,22 @@ export default function AdminDashboard({ onBack }: AdminPanelProps) {
           </li>
           <li className="mb-2">
             <button
-              className={`btn w-100 ${section === "sessions" ? "btn-primary" : "btn-outline-light"}`}
+              className={`btn w-100 ${
+                section === "sessions" ? "btn-primary" : "btn-outline-light"
+              }`}
               onClick={() => setSection("sessions")}
             >
               Сеансы
             </button>
           </li>
         </ul>
-    
       </div>
 
       <div className="flex-grow-1 bg-light text-dark p-4 overflow-auto">
         {section === "movies" && <MoviesManagement token={token} />}
-        {section === "halls" && <HallsManagement token={token} />}
+        {section === "halls" && <HallsManagement />}
         {section === "categories" && <CategoriesManagement token={token} />}
-                {section === "sessions" && <SessionsManagement token={token} />}
+        {section === "sessions" && <SessionsManagement token={token} />}
       </div>
     </div>
   );

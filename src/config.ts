@@ -1,7 +1,7 @@
 // src/config.ts
 import type { PaginationParams } from "./types/common";
 
-export const PLACEHOLDER_POSTER = "https://placehold.com";
+export const PLACEHOLDER_POSTER = "https://placehold.co";
 
 export const MESSAGES = {
   authRequired: "Сначала авторизуйтесь",

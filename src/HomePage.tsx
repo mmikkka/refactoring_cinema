@@ -3,11 +3,17 @@ import { useState } from "react";
 import * as movieApi from "./types/movie";
 import { useFilms } from "./hooks/useFilms";
 import MovieDetailsPage from "./MovieDetailsPage";
-import MovieCard from "./MovieCard";
+import MovieDisplay from "./components/MovieDisplay";
+import { useNavigate } from "react-router-dom";
 
 export default function HomePage() {
   const { films, loading, error } = useFilms();
   const [selectedFilm, setSelectedFilm] = useState<movieApi.Film | null>(null);
+  const navigate = useNavigate();
+
+  const handleSelect = (id: string | number) => {
+    navigate(`/movie/${id}`);
+  };
 
   if (selectedFilm) {
     return (
@@ -29,10 +35,18 @@ export default function HomePage() {
   return (
     <div className="container py-5 d-flex flex-wrap gap-4">
       {films.map((film) => (
-        <MovieCard
+        <MovieDisplay
           key={film.id}
           movie={film}
-          onSelect={() => setSelectedFilm(film)}
+          variant="card"
+          actionButton={
+            <button
+              onClick={() => handleSelect(film.id)}
+              className="btn btn-primary w-100"
+            >
+              Подробнее
+            </button>
+          }
         />
       ))}
     </div>

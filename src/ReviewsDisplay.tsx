@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { httpClient } from "./api/http";
+//import { httpClient } from "./api/http";
 
 interface Review {
   id: number;
@@ -14,6 +14,26 @@ interface Props {
   movieId: number;
 }
 
+// Добавляем моки для отзывов
+const MOCK_REVIEWS: Review[] = [
+  {
+    id: 1,
+    filmId: "1",
+    clientId: "Алексей",
+    rating: 5,
+    text: "Потрясающий фильм! Визуальные эффекты на высоте.",
+    createdAt: new Date().toISOString(),
+  },
+  {
+    id: 2,
+    filmId: "1",
+    clientId: "Марина",
+    rating: 4,
+    text: "Очень глубокий смысл, но немного затянуто в середине.",
+    createdAt: new Date().toISOString(),
+  },
+];
+
 export default function ReviewsDisplay({ movieId }: Props) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
@@ -23,10 +43,17 @@ export default function ReviewsDisplay({ movieId }: Props) {
     const fetchReviews = async () => {
       try {
         setLoading(true);
+
+        /* // Старый код запроса к API закомментирован
         const response = await httpClient.get(`/films/${movieId}/reviews`, {
           params: { page: 0, size: 20 },
         });
-        setReviews(response.data.data || []);
+        setReviews(response.data.data || []); 
+        */
+
+        // Имитируем задержку сети и возвращаем моки
+        await new Promise((resolve) => setTimeout(resolve, 600));
+        setReviews(MOCK_REVIEWS);
       } catch (err) {
         console.error(err);
         setError("Ошибка загрузки отзывов");
@@ -53,7 +80,7 @@ export default function ReviewsDisplay({ movieId }: Props) {
         >
           <div className="d-flex justify-content-between">
             <strong>{r.clientId}</strong>
-            <span>⭐ {r.rating}</span>
+            <span style={{ color: "#ffc107" }}>⭐ {r.rating}</span>
           </div>
           <p className="mb-0 mt-2">{r.text}</p>
         </div>

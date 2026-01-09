@@ -25,7 +25,7 @@ interface UserProfileProps {
   onBack?: () => void;
 }
 
-export default function UserProfilePage({ token, onBack }: UserProfileProps) {
+export default function UserProfilePage({ onBack }: UserProfileProps) {
   const [user, setUser] = useState<userApi.User | null>(null);
   const [form, setForm] = useState({
     firstName: "",
