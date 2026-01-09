@@ -21,7 +21,7 @@ vi.mock("./api/http", () => ({
 
 vi.mock("./ReviewsDisplay", () => ({ default: () => <div>Reviews</div> }));
 
-const TEST_DATE = "2026-01-08";
+const TEST_DATE = "2026-01-09";
 
 const mockMovie: Film = {
   id: 1,
