@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { BrowserRouter as Router } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import { getCurrentUser, logout } from "./api/auth";
-import { AppRoutes } from "./components/AppRoutes"; // Импортируем новый роутер
+import { AppRoutes } from "./components/AppRoutes"; 
 import Header from "./Header";
 import { type UserRoleType } from "./constants";
 
@@ -17,6 +17,13 @@ export default function App() {
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [userRole, setUserRole] = useState<UserRoleType | null>(null);
 
+  
+  const handleLogout = useCallback(() => {
+    logout();
+    setAccessToken(null);
+    setUserRole(null);
+  }, []);
+  
   /**
    * Единая функция для обновления стейта авторизации.
    * Вызывается при логине, регистрации и восстановлении сессии.
@@ -30,21 +37,25 @@ export default function App() {
       console.error("Token decoding failed:", error);
       handleLogout();
     }
-  }, []);
+  }, [handleLogout]);
 
-  const handleLogout = () => {
-    logout();
-    setAccessToken(null);
-    setUserRole(null);
-  };
-
-  // Восстановление сессии при загрузке
   useEffect(() => {
     const currentUser = getCurrentUser();
-    if (currentUser?.accessToken) {
+    if (!currentUser?.accessToken) return;
+
+    try {
+      const decoded = jwtDecode<TokenPayload>(currentUser.accessToken);
+      
+      if (decoded.exp * 1000 < Date.now()) {
+        handleLogout();
+        return;
+      }
+
       handleAuthSuccess({ accessToken: currentUser.accessToken });
+    } catch (e) {
+      handleLogout();
     }
-  }, [handleAuthSuccess]);
+  }, [handleAuthSuccess, handleLogout]);
 
   return (
     <Router>

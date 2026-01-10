@@ -77,7 +77,7 @@ export interface Seat {
   id: number;
   row: number;
   number: number;
-  category: "VIP" | "Standard";
+  category: "VIP" | "Standart";
   price: number;
   isTaken: boolean;
 }

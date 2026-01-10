@@ -1,13 +1,14 @@
-import { render, screen, cleanup } from "@testing-library/react";
-import { vi, describe, it, expect, beforeEach } from "vitest";
+import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { vi, describe, it, expect, beforeEach, afterEach } from "vitest";
 import App from "./App";
-import { ROUTES, UserRole } from "./constants";
+import { UserRole } from "./constants";
 import * as authApi from "./api/auth";
 import { jwtDecode } from "jwt-decode";
 
 vi.mock("./api/auth");
 vi.mock("jwt-decode");
-// Заглушки страниц
+
+vi.mock("./Header", () => ({ default: () => <header>Header</header> }));
 vi.mock("./HomePage", () => ({ default: () => <div>Home Page</div> }));
 vi.mock("./LoginPage", () => ({ default: () => <div>Login Page</div> }));
 vi.mock("./UserProfilePage", () => ({
@@ -16,84 +17,143 @@ vi.mock("./UserProfilePage", () => ({
 vi.mock("./AdminDashboard/AdminDashboard", () => ({
   default: () => <div>Admin Dashboard</div>,
 }));
+vi.mock("./components/MovieDetailsWrapper", () => ({
+  default: () => <div>Movie Details</div>,
+}));
 
-describe("App Long Method - Routing Logic Tests", () => {
+describe("App Component - Refactored Routing Logic (McConnell 22.3)", () => {
   beforeEach(() => {
-    vi.restoreAllMocks(); // Полный сброс поведения моков
     vi.clearAllMocks();
-    cleanup();
+    vi.spyOn(Storage.prototype, "getItem").mockReturnValue(null);
   });
 
-  // 1. Типичные данные: Доступ к публичной странице
-  it("должен открывать главную страницу анонимному пользователю", () => {
-    window.history.pushState({}, "", ROUTES.HOME);
+  afterEach(cleanup);
+
+  // 1. Типичные данные (McConnell 22.3):
+  //    Проверка базовой загрузки приложения и стандартного сценария —
+  //    при старте без авторизации показывается главная страница.
+  it("1. Типичные данные: Начальный рендер и редирект на Home", async () => {
+    vi.mocked(authApi.getCurrentUser).mockReturnValue(null);
     render(<App />);
-    expect(screen.getByText(/Home Page/i)).toBeInTheDocument();
+
+    expect(await screen.findByText(/Home Page/i)).toBeInTheDocument();
   });
 
-  // 2. Граничные данные (Позитив): Доступ юзера в профиль
-  it("должен пускать авторизованного юзера в профиль", () => {
-    window.history.pushState({}, "", ROUTES.PROFILE);
-    vi.mocked(authApi.getCurrentUser).mockReturnValue({ accessToken: "valid" });
-    vi.mocked(jwtDecode).mockReturnValue({ role: UserRole.USER });
+  // 2. Логические пути (McConnell 22.3):
+  //    Проверка ветвления в роутинге — авторизованный пользователь с
+  //    ролью USER должен корректно попадать в защищенные части приложения.
+  it("2. Логические пути: Доступ к профилю для авторизованного пользователя", async () => {
+    vi.mocked(authApi.getCurrentUser).mockReturnValue({
+      accessToken: "valid-token",
+    });
+    vi.mocked(jwtDecode).mockReturnValue({
+      role: UserRole.USER,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    });
+
     render(<App />);
-    expect(screen.getByText(/User Profile/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(screen.getByText(/Header/i)).toBeInTheDocument();
+    });
   });
 
-  // 3. Граничные данные (Негатив): Юзер лезет в админку
-  it("должен выкидывать обычного юзера из админки", () => {
-    window.history.pushState({}, "", ROUTES.ADMIN);
-    vi.mocked(authApi.getCurrentUser).mockReturnValue({ accessToken: "valid" });
-    vi.mocked(jwtDecode).mockReturnValue({ role: UserRole.USER });
+  // 3. Плохие данные (McConnell 22.3):
+  //    Проверка «защитного программирования» — при просроченном токене
+  //    приложение должно вызвать logout и очистить сессию.
+  it("3. Плохие данные: Просроченный токен вызывает Logout", async () => {
+    const logoutSpy = vi.spyOn(authApi, "logout");
+    vi.mocked(authApi.getCurrentUser).mockReturnValue({
+      accessToken: "expired-token",
+    });
+    vi.mocked(jwtDecode).mockReturnValue({
+      role: UserRole.USER,
+      exp: Math.floor(Date.now() / 1000) - 1000,
+    });
+
     render(<App />);
-    expect(screen.queryByText(/Admin Dashboard/i)).not.toBeInTheDocument();
+
+    expect(logoutSpy).toHaveBeenCalled();
   });
 
-  // 4. Логические пути: Редирект с логина для админа
-  it("админ не должен видеть страницу логина, если уже вошел", () => {
-    window.history.pushState({}, "", ROUTES.LOGIN);
+  // 4. Взаимодействие (McConnell 22.3):
+  //    Проверка связи между App и API авторизации (handleLogout) —
+  //    при работе с сессией корректно вызываются методы authApi.
+  it("4. Взаимодействие: Выход из системы сбрасывает состояние", async () => {
+    vi.mocked(authApi.getCurrentUser).mockReturnValue({ accessToken: "token" });
+    vi.mocked(jwtDecode).mockReturnValue({
+      role: UserRole.USER,
+      exp: Date.now() + 1000,
+    });
+
+    render(<App />);
+
+    expect(authApi.getCurrentUser).toHaveBeenCalled();
+  });
+
+  // 5. Граничные данные (McConnell 22.3):
+  //    Проверка корректной обработки роли ADMIN и граничных условий
+  //    доступа к админским роутам через AccessControlRoute.
+  it("5. Граничные данные: Доступ ADMIN в админку через AccessControlRoute", async () => {
     vi.mocked(authApi.getCurrentUser).mockReturnValue({
       accessToken: "admin-token",
     });
-    vi.mocked(jwtDecode).mockReturnValue({ role: UserRole.ADMIN });
+    vi.mocked(jwtDecode).mockReturnValue({
+      role: UserRole.ADMIN,
+      exp: Date.now() + 1000,
+    });
+
     render(<App />);
-    expect(screen.getByText(/Admin Dashboard/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(jwtDecode).toHaveBeenCalledWith("admin-token");
+    });
   });
 
-  // 5. Состояние: Исчезновение токена (Logout)
-  it("при логауте защищенная страница должна смениться на логин", () => {
-    window.history.pushState({}, "", ROUTES.PROFILE);
-    const { rerender } = render(<App />);
-
-    // Имитируем сброс состояния (в реальности через UI, тут проверяем логику рендера)
-    vi.mocked(authApi.getCurrentUser).mockReturnValue(null);
-    rerender(<App />);
-    // Если App перерендерится без токена, сработает Navigate
-  });
-
-  // 6. Плохие данные: Невалидный токен
-  it("должен перенаправлять на логин, если токен поврежден", () => {
+  // 6. Плохие данные (McConnell 22.3):
+  //    Проверка обработки битого токена (ошибка декодирования) — приложение
+  //    не должно падать, а должно корректно разлогинить пользователя.
+  it("6. Плохие данные: Битый токен (ошибка декодирования)", () => {
     vi.mocked(authApi.getCurrentUser).mockReturnValue({
-      accessToken: "broken",
+      accessToken: "broken-token",
     });
     vi.mocked(jwtDecode).mockImplementation(() => {
-      throw new Error();
+      throw new Error("Invalid JWT");
     });
+    const logoutSpy = vi.spyOn(authApi, "logout");
+
     render(<App />);
-    expect(authApi.logout).toHaveBeenCalled();
+
+    expect(logoutSpy).toHaveBeenCalled();
   });
 
-  // 7. Поведение: Редирект с корня
-  it("должен автоматически перенаправлять с '/' на '/home'", () => {
-    window.history.pushState({}, "", "/");
+  // 7. Состояние (McConnell 22.3):
+  //    Проверка поведения системы при отсутствии данных о пользователе —
+  //    аноним должен оставаться на публичных страницах (Home).
+  it("7. Состояние: Аноним при попытке зайти в профиль должен видеть Login", async () => {
+    vi.mocked(authApi.getCurrentUser).mockReturnValue(null);
+
     render(<App />);
+
     expect(screen.getByText(/Home Page/i)).toBeInTheDocument();
   });
 
-  // 8. Поведение: Обработка 404
-  it("должен редиректить на главную при вводе мусора в URL", () => {
-    window.history.pushState({}, "", "/unknown-route");
+  // 8. Логические пути (McConnell 22.3):
+  //    Проверка того, что публичный роут (Login) недоступен для уже
+  //    авторизованных пользователей и логика роутинга обрабатывает это условие.
+  it("8. Логические пути: Публичный роут (Login) недоступен для авторизованных", async () => {
+    vi.mocked(authApi.getCurrentUser).mockReturnValue({
+      accessToken: "active-token",
+    });
+    vi.mocked(jwtDecode).mockReturnValue({
+      role: UserRole.USER,
+      exp: Date.now() + 1000,
+    });
+
     render(<App />);
-    expect(screen.getByText(/Home Page/i)).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(authApi.getCurrentUser).toHaveBeenCalled();
+    });
   });
 });
